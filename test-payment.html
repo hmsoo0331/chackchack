@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>결제 페이지 테스트</title>
+</head>
+<body>
+    <h2>결제 페이지 테스트</h2>
+    <p>아래 링크들을 클릭해서 결제 페이지를 테스트해보세요:</p>
+    
+    <h3>1. 기본 결제 (금액 없음)</h3>
+    <a href="http://172.30.1.66:3000/payer.html?bank=우리은행&account=1002955077326&holder=결제용" target="_blank">
+        우리은행 결제 테스트
+    </a>
+    
+    <h3>2. 금액 포함 결제</h3>
+    <a href="http://172.30.1.66:3000/payer.html?bank=우리은행&account=1002955077326&holder=결제용&amount=5000" target="_blank">
+        우리은행 결제 테스트 (5,000원)
+    </a>
+    
+    <h3>3. QR ID 포함 결제</h3>
+    <a href="http://172.30.1.66:3000/payer.html?qrId=test-123&bank=우리은행&account=1002955077326&holder=결제용&amount=10000" target="_blank">
+        우리은행 결제 테스트 + 알림 (10,000원)
+    </a>
+</body>
+</html>
