@@ -15,6 +15,7 @@ interface AppState {
   setBankAccounts: (accounts: BankAccount[]) => void;
   setQrCodes: (qrCodes: QrCode[]) => void;
   addLocalQrCode: (qrCode: QrCode) => void;
+  updateLocalQrCode: (qrId: string, updatedData: QrCode) => Promise<void>;
   loadLocalQrCodes: () => Promise<void>;
   initializeAuth: () => Promise<void>;
   clearAllData: () => Promise<void>;
@@ -141,6 +142,22 @@ export const useStore = create<AppState>((set, get) => ({
       console.log('모든 데이터 삭제 완료');
     } catch (error) {
       console.error('Error clearing all data:', error);
+    }
+  },
+
+  updateLocalQrCode: async (qrId: string, updatedData: QrCode) => {
+    try {
+      const currentLocal = get().localQrCodes;
+      const updatedLocal = currentLocal.map(qr => 
+        qr.qrId === qrId ? { ...qr, ...updatedData } : qr
+      );
+      
+      await AsyncStorage.setItem('localQrCodes', JSON.stringify(updatedLocal));
+      set({ localQrCodes: updatedLocal });
+      
+      console.log('로컬 QR 코드 업데이트됨:', qrId);
+    } catch (error) {
+      console.error('Error updating local QR code:', error);
     }
   },
 

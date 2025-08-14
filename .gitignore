@@ -71,3 +71,6 @@ lerna-debug.log*
 # Build outputs
 build/
 dist/
+
+# Environment variables (Security)
+.env*

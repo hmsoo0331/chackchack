@@ -6,8 +6,10 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Alert,
+  BackHandler,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import Svg, { Rect, Path } from 'react-native-svg';
 // import { GoogleSignin } from '@react-native-google-signin/google-signin';
 // import KakaoLogins from '@react-native-seoul/kakao-login';
@@ -16,6 +18,12 @@ import { authAPI } from '../api/auth';
 import { qrcodesAPI } from '../api/qrcodes';
 import { accountsAPI } from '../api/accounts';
 import { colors, typography, spacing, borderRadius } from '../theme';
+import { signInWithKakao } from '../services/kakaoAuth';
+import { signInWithKakaoWeb } from '../services/kakaoAuthWeb';
+import { signInWithKakaoDirect } from '../services/kakaoAuthDirect';
+import { signInWithKakaoCustom } from '../services/kakaoAuthCustom';
+import { signInWithKakaoReal } from '../services/kakaoAuthReal';
+import { checkRedirectUri } from '../utils/checkRedirectUri';
 
 const ChakchakLogo = ({ size = 60 }) => (
   <Svg width={size} height={size} viewBox="0 0 256 256" fill="none">
@@ -102,6 +110,23 @@ export default function LoginScreen() {
     navigation.navigate('MyQRList');
   };
 
+  // 하드웨어 뒤로가기 버튼 제어
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MyQRList' }],
+        });
+        return true; // 기본 뒤로가기 동작 방지
+      };
+
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      
+      return () => backHandler.remove();
+    }, [navigation])
+  );
+
   // 소셜 로그인 초기화 (현재는 mock 버전)
   // React.useEffect(() => {
   //   GoogleSignin.configure({
@@ -111,77 +136,103 @@ export default function LoginScreen() {
 
   const handleKakaoLogin = async () => {
     try {
-      // 현재는 Expo 환경에서 mock 버전으로 수행
-      // 실제 배포 시에는 Expo dev build 또는 bare workflow로 변경 필요
-      const userInfo = {
-        email: 'kakao_user@kakao.com',
-        nickname: '카카오 사용자',
-        authProvider: 'kakao',
-      };
+      console.log('카카오 로그인 시작...');
+      
+      // 실제 카카오 OAuth 로그인 시도
+      let kakaoResult = await signInWithKakaoReal();
+      
+      // 실제 로그인이 실패하면 Mock 로그인으로 폴백
+      if (!kakaoResult.success) {
+        console.log('실제 카카오 로그인 실패, 폴백 처리 중...', kakaoResult.error);
+        
+        if (kakaoResult.error === 'EXPO_AUTH_PROXY_ERROR') {
+          console.log('Expo Auth 프록시 이슈 발생 - Mock 로그인으로 전환');
+          
+          // Mock 로그인으로 폴백
+          kakaoResult = await signInWithKakaoCustom();
+          
+          if (!kakaoResult.success) {
+            throw new Error('카카오 로그인 및 Mock 로그인 모두 실패');
+          }
+          
+          console.log('Mock 로그인으로 성공적으로 전환됨');
+          
+          // Mock 데이터 사용 알림
+          Alert.alert(
+            '개발 모드',
+            'Expo Go 환경 제약으로 Mock 데이터로 로그인됩니다.\n실제 앱에서는 정상적인 카카오 로그인이 작동합니다.',
+            [{ text: '확인' }]
+          );
+        } else {
+          // 다른 에러의 경우도 Mock으로 폴백 시도
+          console.log('다른 에러로 인한 폴백 시도:', kakaoResult.error);
+          
+          kakaoResult = await signInWithKakaoCustom();
+          
+          if (!kakaoResult.success) {
+            throw new Error(kakaoResult.error || '카카오 로그인 실패');
+          }
+          
+          Alert.alert(
+            '로그인 방식 변경',
+            '일시적인 문제로 Mock 로그인을 사용합니다.',
+            [{ text: '확인' }]
+          );
+        }
+      }
 
+      // 실제 카카오 로그인 성공 시 알림
+      if (kakaoResult.success && !kakaoResult.isMock) {
+        console.log('실제 카카오 로그인 성공! 🎉');
+        Alert.alert(
+          '로그인 성공',
+          '카카오 계정으로 성공적으로 로그인되었습니다!',
+          [{ text: '확인' }]
+        );
+      }
+
+      // 카카오 사용자 정보 추출
+      const { userInfo, accessToken: kakaoAccessToken } = kakaoResult;
+      const email = userInfo?.kakao_account?.email || `kakao_${userInfo?.id}@kakao.com`;
+      const nickname = userInfo?.properties?.nickname || 
+                       userInfo?.kakao_account?.profile?.nickname || 
+                       '카카오 사용자';
+
+      console.log('카카오 로그인 성공:', { 
+        email, 
+        nickname, 
+        isReal: !kakaoResult.isMock,
+        userId: userInfo?.id 
+      });
+
+      // 백엔드로 소셜 로그인 정보 전송
       const authResult = await authAPI.socialLogin(
-        userInfo.email,
-        userInfo.nickname,
-        userInfo.authProvider
+        email,
+        nickname,
+        'kakao',
+        kakaoAccessToken // 카카오 액세스 토큰도 함께 전송
       );
 
+      // 앱 상태 업데이트
       await setAuth(authResult.accessToken, authResult.owner);
+      
+      // 카카오 액세스 토큰 저장 (로그아웃 시 필요)
+      await AsyncStorage.setItem('kakaoAccessToken', kakaoAccessToken);
+      
       await handleLoginSuccess();
     } catch (error) {
       console.error('카카오 로그인 에러:', error);
-      Alert.alert('오류', '카카오 로그인에 실패했습니다.');
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    try {
-      // 현재는 Expo 환경에서 mock 버전으로 수행
-      const userInfo = {
-        email: 'google_user@gmail.com',
-        nickname: '구글 사용자',
-        authProvider: 'google',
-      };
       
-      const authResult = await authAPI.socialLogin(
-        userInfo.email,
-        userInfo.nickname,
-        userInfo.authProvider
-      );
-
-      await setAuth(authResult.accessToken, authResult.owner);
-      await handleLoginSuccess();
-    } catch (error) {
-      console.error('구글 로그인 에러:', error);
-      Alert.alert('오류', '구글 로그인에 실패했습니다.');
+      // 상세한 에러 메시지 표시
+      const errorMessage = error.message?.includes('Network Error') 
+        ? '네트워크 연결을 확인해주세요.' 
+        : '카카오 로그인에 실패했습니다.';
+        
+      Alert.alert('오류', errorMessage);
     }
   };
 
-  const handleNaverLogin = async () => {
-    try {
-      // 네이버 로그인은 모크 버전으로 구현
-      const mockUserData = {
-        email: 'user@naver.com',
-        nickname: '네이버 사용자',
-        authProvider: 'naver',
-      };
-
-      const result = await authAPI.socialLogin(
-        mockUserData.email,
-        mockUserData.nickname,
-        mockUserData.authProvider
-      );
-
-      await setAuth(result.accessToken, result.owner);
-
-      if (qrCodeToSave) {
-        await saveQRToServer(qrCodeToSave);
-      }
-
-      navigation.navigate('MyQRList');
-    } catch (error) {
-      Alert.alert('오류', '네이버 로그인에 실패했습니다.');
-    }
-  };
+  // 네이버, 구글 로그인은 추후 구현 예정
 
   const handleGuestContinue = async () => {
     try {
@@ -202,7 +253,10 @@ export default function LoginScreen() {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => navigation.reset({
+            index: 0,
+            routes: [{ name: 'MyQRList' }],
+          })}
         >
           <Text style={styles.backButtonText}>‹</Text>
         </TouchableOpacity>
@@ -225,23 +279,18 @@ export default function LoginScreen() {
             style={[styles.socialButton, styles.kakaoButton]}
             onPress={handleKakaoLogin}
           >
-            <Text style={styles.socialButtonText}>카카오로 시작하기</Text>
+            <View style={styles.kakaoButtonContent}>
+              <View style={styles.kakaoIcon}>
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                  <Path 
+                    d="M12 3C16.97 3 21 6.155 21 10c0 2.41-1.553 4.546-3.94 5.83l-.64 2.87c-.062.28-.36.41-.61.27l-3.657-2.06c-.384.032-.775.05-1.153.05-4.97 0-9-3.155-9-7S7.03 3 12 3z"
+                    fill="#3C1E1E"
+                  />
+                </Svg>
+              </View>
+              <Text style={[styles.socialButtonText, styles.kakaoButtonText]}>카카오톡으로 시작하기</Text>
+            </View>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.socialButton, styles.naverButton]}
-            onPress={handleNaverLogin}
-          >
-            <Text style={styles.socialButtonText}>네이버로 시작하기</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.socialButton, styles.googleButton]}
-            onPress={handleGoogleLogin}
-          >
-            <Text style={styles.socialButtonText}>구글로 시작하기</Text>
-          </TouchableOpacity>
-
         </View>
 
         <TouchableOpacity style={styles.guestButton} onPress={handleGuestContinue}>
@@ -312,24 +361,46 @@ const styles = StyleSheet.create({
     marginBottom: spacing['3xl'],
   },
   socialButton: {
-    padding: spacing.lg - 2,
+    padding: spacing.lg,
     borderRadius: borderRadius.lg,
     alignItems: 'center',
-    minHeight: 48,
+    minHeight: 56,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   kakaoButton: {
-    backgroundColor: '#1DB5A6',
+    backgroundColor: '#F7E600', // 채도가 낮은 카카오 노란색
+    borderWidth: 1,
+    borderColor: '#E6D200',
   },
-  naverButton: {
-    backgroundColor: '#0D9488',
+  kakaoButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
-  googleButton: {
-    backgroundColor: '#0F766E',
+  kakaoIcon: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(60, 30, 30, 0.1)',
+    borderRadius: 12,
   },
   socialButtonText: {
     ...typography.styles.buttonPrimary,
     color: colors.white,
-    fontWeight: '500',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  kakaoButtonText: {
+    color: '#3C1E1E', // 갈색 텍스트
+    fontWeight: '700',
   },
   guestButton: {
     padding: spacing.lg + 2,

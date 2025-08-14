@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "ChackChack",
+    "slug": "chackchack",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,9 +13,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
+      "bundleIdentifier": "com.chackchack.app",
       "supportsTablet": true
     },
     "android": {
+      "package": "com.chackchack.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -25,8 +27,17 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "scheme": "chackchack",
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "QR코드 이미지를 갤러리에 저장하기 위해 사진첩 접근 권한이 필요합니다.",
+          "savePhotosPermission": "QR코드 이미지를 갤러리에 저장하기 위해 사진 저장 권한이 필요합니다.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ]
     ]
   }
 }

@@ -17,6 +17,7 @@ import { authAPI } from '../api/auth';
 import QRCode from 'react-native-qrcode-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius } from '../theme';
+import * as WebBrowser from 'expo-web-browser';
 
 export default function MyQRListScreen() {
   const navigation = useNavigation<any>();
@@ -163,6 +164,27 @@ export default function MyQRListScreen() {
     );
   };
 
+  const handlePrivacyPolicy = async () => {
+    try {
+      const result = await WebBrowser.openBrowserAsync(
+        'https://hmsoo0331.github.io/chackchack/',
+        {
+          presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+          controlsColor: colors.primary,
+        }
+      );
+      
+      // 브라우저가 닫힌 후 더보기 메뉴 닫기
+      setShowMoreMenu(false);
+      
+      console.log('개인정보처리방침 브라우저 결과:', result);
+    } catch (error) {
+      console.error('개인정보처리방침 열기 오류:', error);
+      Alert.alert('오류', '개인정보처리방침을 열 수 없습니다.');
+      setShowMoreMenu(false);
+    }
+  };
+
   const handleDeleteAccount = async () => {
     Alert.alert(
       '계정 탈퇴',
@@ -243,16 +265,16 @@ export default function MyQRListScreen() {
           <Text style={styles.qrBank}>
             {item.bankAccount?.bankName} | {item.bankAccount?.accountNumber}
           </Text>
-          {item.baseAmount && (
+          {item.baseAmount > 0 && (
             <Text style={styles.qrAmount}>
               지정 금액: {Math.floor(item.baseAmount).toLocaleString()}원
             </Text>
           )}
-          {item.discountType && item.discountValue && (
+          {item.discountType && item.discountValue > 0 && (
             <Text style={styles.qrDiscount}>
               할인: {item.discountType === 'percentage' 
-                ? `${item.discountValue}%` 
-                : `${Math.floor(item.discountValue).toLocaleString()}원`}
+                ? `${item.discountValue}% 할인` 
+                : `${Math.floor(item.discountValue).toLocaleString()}원 할인`}
             </Text>
           )}
         </View>
@@ -343,6 +365,16 @@ export default function MyQRListScreen() {
           onPress={() => setShowMoreMenu(false)}
         >
           <View style={styles.moreMenuContainer}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={handlePrivacyPolicy}
+            >
+              <Ionicons name="document-text-outline" size={20} color={colors.textSecondary} />
+              <Text style={styles.menuItemText}>개인정보처리방침</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.menuDivider} />
+            
             <TouchableOpacity
               style={styles.menuItem}
               onPress={handleLogout}
@@ -559,6 +591,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.lg,
     gap: spacing.sm,
+  },
+  menuItemText: {
+    ...typography.styles.body,
+    color: colors.textSecondary,
+    fontWeight: typography.weights.medium,
   },
   menuItemLogout: {
     ...typography.styles.body,

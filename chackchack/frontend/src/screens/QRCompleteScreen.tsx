@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,12 @@ import {
   Alert,
   Image,
   ScrollView,
+  BackHandler,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import QRCode from 'react-native-qrcode-svg';
+import ViewShot from 'react-native-view-shot';
+import * as MediaLibrary from 'expo-media-library';
 import { useStore } from '../store/useStore';
 import { qrcodesAPI } from '../api/qrcodes';
 import { accountsAPI } from '../api/accounts';
@@ -22,10 +25,28 @@ export default function QRCompleteScreen() {
   const route = useRoute<any>();
   const { qrCode, isNewlyCreated = false } = route.params; // 새로 생성된 것인지 구분
   const { isAuthenticated, owner, setQrCodes, addLocalQrCode, loadLocalQrCodes } = useStore();
+  const viewShotRef = useRef<ViewShot>(null);
 
   // 디버깅을 위한 로그
   console.log('QRCompleteScreen - qrCode 데이터:', qrCode);
   console.log('QRCompleteScreen - qrCodeImage:', qrCode.qrCodeImage);
+
+  // 하드웨어 뒤로가기 버튼 제어
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MyQRList' }],
+        });
+        return true; // 기본 뒤로가기 동작 방지
+      };
+
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      
+      return () => backHandler.remove();
+    }, [navigation])
+  );
 
   const handleSaveToDevice = async () => {
     try {
@@ -43,7 +64,10 @@ export default function QRCompleteScreen() {
         {
           text: '확인',
           onPress: () => {
-            navigation.navigate('MyQRList');
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'MyQRList' }],
+            });
           }
         }
       ]);
@@ -129,7 +153,10 @@ export default function QRCompleteScreen() {
           style: 'destructive',
           onPress: () => {
             Alert.alert('삭제 완료', 'QR코드가 삭제되었습니다.');
-            navigation.goBack();
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'MyQRList' }],
+            });
             // TODO: 실제 삭제 로직 구현
           },
         },
@@ -137,12 +164,65 @@ export default function QRCompleteScreen() {
     );
   };
 
+  const handleSaveImage = async () => {
+    try {
+      // 1. 미디어 라이브러리 권한 요청
+      const permissionResult = await MediaLibrary.requestPermissionsAsync();
+      
+      if (!permissionResult.granted) {
+        Alert.alert(
+          '권한 필요',
+          '갤러리에 이미지를 저장하려면 사진첩 접근 권한이 필요합니다.',
+          [
+            { text: '취소', style: 'cancel' },
+            { text: '설정으로 이동', onPress: () => {
+              // 설정 앱으로 이동하는 로직은 필요시 추가
+            }}
+          ]
+        );
+        return;
+      }
+
+      // 2. ViewShot으로 특정 영역 캡처
+      if (!viewShotRef.current) {
+        Alert.alert('오류', '이미지 캡처에 실패했습니다.');
+        return;
+      }
+
+      console.log('이미지 캡처 시작...');
+      const uri = await viewShotRef.current.capture();
+      console.log('캡처된 이미지 URI:', uri);
+
+      // 3. 갤러리에 저장
+      const asset = await MediaLibrary.createAssetAsync(uri);
+      console.log('갤러리 저장 완료:', asset);
+
+      // 4. 성공 피드백
+      Alert.alert(
+        '저장 완료',
+        'QR코드 이미지가 갤러리에 저장되었습니다.',
+        [{ text: '확인' }]
+      );
+
+    } catch (error) {
+      console.error('이미지 저장 실패:', error);
+      Alert.alert(
+        '저장 실패', 
+        '이미지 저장 중 오류가 발생했습니다. 다시 시도해주세요.',
+        [{ text: '확인' }]
+      );
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => navigation.reset({
+            index: 0,
+            routes: [{ name: 'MyQRList' }],
+          })}
         >
           <Text style={styles.backButtonText}>‹</Text>
         </TouchableOpacity>
@@ -158,74 +238,80 @@ export default function QRCompleteScreen() {
         showsVerticalScrollIndicator={false}
       >
       <View style={styles.content}>
-        <Text style={styles.qrNameTitle}>{qrCode.qrName}</Text>
-        
-        <View style={styles.qrContainer}>
-          {qrCode.qrCodeImage ? (
-            // base64 이미지인 경우 Image 컴포넌트 사용, URL인 경우 QRCode 컴포넌트 사용
-            qrCode.qrCodeImage.startsWith('data:image') ? (
-              <Image
-                source={{ uri: qrCode.qrCodeImage }}
-                style={{ width: 250, height: 250 }}
-                resizeMode="contain"
-              />
+        {/* 캡처할 영역을 ViewShot으로 감싸기 */}
+        <ViewShot 
+          ref={viewShotRef} 
+          options={{ format: "png", quality: 0.9 }}
+          style={styles.captureArea}
+        >
+          <Text style={styles.qrNameTitle}>{qrCode.qrName}</Text>
+          
+          <View style={styles.qrContainer}>
+            {qrCode.qrCodeImage ? (
+              // base64 이미지인 경우 Image 컴포넌트 사용, URL인 경우 QRCode 컴포넌트 사용
+              qrCode.qrCodeImage.startsWith('data:image') ? (
+                <Image
+                  source={{ uri: qrCode.qrCodeImage }}
+                  style={{ width: 250, height: 250 }}
+                  resizeMode="contain"
+                />
+              ) : (
+                <QRCode
+                  value={qrCode.qrCodeImage}
+                  size={250}
+                  backgroundColor="white"
+                  color="black"
+                />
+              )
             ) : (
-              <QRCode
-                value={qrCode.qrCodeImage}
-                size={250}
-                backgroundColor="white"
-                color="black"
-              />
-            )
-          ) : (
-            <View style={{ padding: 20, alignItems: 'center' }}>
-              <Text style={{ fontSize: 16, color: '#666' }}>QR 코드를 생성 중입니다...</Text>
-            </View>
-          )}
-        </View>
+              <View style={{ padding: 20, alignItems: 'center' }}>
+                <Text style={{ fontSize: 16, color: '#666' }}>QR 코드를 생성 중입니다...</Text>
+              </View>
+            )}
+          </View>
 
-        <View style={styles.infoContainer}>
-          <Text style={styles.bankInfo}>
-            {qrCode.bankAccount?.bankName} | {qrCode.bankAccount?.accountNumber}
-          </Text>
-          <Text style={styles.holderInfo}>{qrCode.bankAccount?.accountHolder}</Text>
-          
-          {/* 지정 금액 표시 */}
-          {qrCode.baseAmount && (
-            <Text style={styles.amountInfo}>
-              지정 금액: {Math.floor(qrCode.baseAmount).toLocaleString()}원
+          <View style={styles.infoContainer}>
+            <Text style={styles.bankInfo}>
+              {qrCode.bankAccount?.bankName} | {qrCode.bankAccount?.accountNumber}
             </Text>
-          )}
-          
-          {/* 할인 정보 표시 */}
-          {qrCode.discountType && qrCode.discountValue && (
-            <Text style={styles.discountInfo}>
-              할인: {qrCode.discountType === 'percentage' 
-                ? `${qrCode.discountValue}%` 
-                : `${Math.floor(qrCode.discountValue).toLocaleString()}원`}
-              {qrCode.discountType === 'percentage' ? ' 할인' : ' 할인'}
-            </Text>
-          )}
-          
-          {/* 최종 금액 계산 및 표시 (지정 금액과 할인이 모두 있을 때만) */}
-          {qrCode.baseAmount && qrCode.discountType && qrCode.discountValue && (
-            <Text style={styles.finalAmountInfo}>
-              최종 금액: {(() => {
-                const baseAmount = qrCode.baseAmount;
-                const discountValue = qrCode.discountValue;
-                let finalAmount = baseAmount;
-                
-                if (qrCode.discountType === 'percentage') {
-                  finalAmount = baseAmount * (1 - discountValue / 100);
-                } else {
-                  finalAmount = baseAmount - discountValue;
-                }
-                
-                return Math.floor(Math.max(0, finalAmount)).toLocaleString();
-              })()}원
-            </Text>
-          )}
-        </View>
+            <Text style={styles.holderInfo}>{qrCode.bankAccount?.accountHolder}</Text>
+            
+            {/* 지정 금액 표시 */}
+            {qrCode.baseAmount > 0 && (
+              <Text style={styles.amountInfo}>
+                지정 금액: {Math.floor(qrCode.baseAmount).toLocaleString()}원
+              </Text>
+            )}
+            
+            {/* 할인 정보 표시 */}
+            {qrCode.discountType && qrCode.discountValue > 0 && (
+              <Text style={styles.discountInfo}>
+                할인: {qrCode.discountType === 'percentage' 
+                  ? `${qrCode.discountValue}% 할인` 
+                  : `${Math.floor(qrCode.discountValue).toLocaleString()}원 할인`}
+              </Text>
+            )}
+            
+            {/* 최종 금액 계산 및 표시 (지정 금액과 할인이 모두 있을 때만) */}
+            {qrCode.baseAmount > 0 && qrCode.discountType && qrCode.discountValue > 0 && (
+              <Text style={styles.finalAmountInfo}>
+                최종 금액: {(() => {
+                  const baseAmount = qrCode.baseAmount;
+                  const discountValue = qrCode.discountValue;
+                  let finalAmount = baseAmount;
+                  
+                  if (qrCode.discountType === 'percentage') {
+                    finalAmount = baseAmount * (1 - discountValue / 100);
+                  } else {
+                    finalAmount = baseAmount - discountValue;
+                  }
+                  
+                  return Math.floor(Math.max(0, finalAmount)).toLocaleString();
+                })()}원
+              </Text>
+            )}
+          </View>
+        </ViewShot>
 
         <View style={styles.buttonContainer}>
           {isNewlyCreated ? (
@@ -274,6 +360,10 @@ export default function QRCompleteScreen() {
             <>
               <TouchableOpacity style={styles.secondaryButton} onPress={handleShare}>
                 <Text style={styles.secondaryButtonText}>공유하기</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.secondaryButton} onPress={handleSaveImage}>
+                <Text style={styles.secondaryButtonText}>이미지 저장</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.primaryButton} onPress={handleEdit}>
@@ -337,6 +427,11 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     alignItems: 'center',
     backgroundColor: colors.gray100,
+  },
+  captureArea: {
+    alignItems: 'center',
+    backgroundColor: colors.gray100,
+    paddingVertical: spacing.lg,
   },
   qrNameTitle: {
     ...typography.styles.heading2,

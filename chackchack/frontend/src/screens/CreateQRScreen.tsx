@@ -13,8 +13,9 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  BackHandler,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useStore } from '../store/useStore';
 import { generateQRData } from '../utils/qrGenerator';
 import * as Crypto from 'expo-crypto';
@@ -38,7 +39,7 @@ const BANKS = [
 export default function CreateQRScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { addLocalQrCode, isAuthenticated, owner, setQrCodes } = useStore();
+  const { addLocalQrCode, updateLocalQrCode, removeLocalQrCode, loadLocalQrCodes, isAuthenticated, owner, setQrCodes } = useStore();
   
   // 편집 모드 확인
   const editingQrCode = route.params?.editingQrCode;
@@ -67,12 +68,29 @@ export default function CreateQRScreen() {
       setAccountNumber(editingQrCode.bankAccount?.accountNumber || '');
       setAccountHolder(editingQrCode.bankAccount?.accountHolder || '');
       setEnableAmount(!!editingQrCode.baseAmount);
-      setAmount(editingQrCode.baseAmount ? editingQrCode.baseAmount.toString() : '');
+      setAmount(editingQrCode.baseAmount ? Math.floor(editingQrCode.baseAmount).toString() : '');
       setEnableDiscount(!!editingQrCode.discountType);
       setDiscountType(editingQrCode.discountType || null);
-      setDiscountValue(editingQrCode.discountValue ? editingQrCode.discountValue.toString() : '');
+      setDiscountValue(editingQrCode.discountValue ? Math.floor(editingQrCode.discountValue).toString() : '');
     }
   }, [isEditMode, editingQrCode]);
+
+  // 하드웨어 뒤로가기 버튼 제어
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MyQRList' }],
+        });
+        return true; // 기본 뒤로가기 동작 방지
+      };
+
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      
+      return () => backHandler.remove();
+    }, [navigation])
+  );
 
   const handleCreateQR = async () => {
     console.log(isEditMode ? 'QR 수정 시작' : 'QR 생성 시작');
@@ -97,35 +115,115 @@ export default function CreateQRScreen() {
       const isRealUser = isAuthenticated && owner && owner.authProvider !== 'guest';
       
       if (isEditMode) {
-        // 편집 모드: 기존 QR 코드 업데이트
-        console.log('편집 모드 - 서버에 업데이트');
+        // 편집 모드 구분: 로컬 QR vs 서버 QR
+        const isLocalQR = !isRealUser || !editingQrCode.accountId;
+        console.log('편집 모드 - 로컬 QR인지:', isLocalQR);
         
-        // 1. 먼저 계좌 정보를 서버에 저장/업데이트 (필요한 경우)
-        const savedAccount = await accountsAPI.create({
-          bankName: selectedBank,
-          accountNumber,
-          accountHolder,
-          isDefault: false,
-        });
-        console.log('계좌 정보 서버 저장 완료:', savedAccount);
-        
-        // 2. QR 코드 업데이트
-        const updatedQR = await qrcodesAPI.update(editingQrCode.qrId, {
-          accountId: savedAccount.accountId,
-          qrName,
-          baseAmount: enableAmount ? Number(amount) : undefined,
-          discountType: enableDiscount ? discountType || undefined : undefined,
-          discountValue: enableDiscount && discountValue ? Number(discountValue) : undefined,
-        });
-        console.log('QR 코드 서버 업데이트 완료:', updatedQR);
-        
-        // 3. 저장된 QR 목록을 다시 불러오기
-        const allQRCodes = await qrcodesAPI.getAll();
-        setQrCodes(allQRCodes);
-        
-        // 업데이트된 QR 상세 화면으로 돌아가기
-        navigation.navigate('QRComplete', { qrCode: updatedQR, isNewlyCreated: false });
-        console.log('QR 완료 페이지로 이동');
+        if (isLocalQR) {
+          // 로컬 QR 편집: 기존 로컬 QR 업데이트하고 새로 생성
+          console.log('로컬 QR 편집 - 새 QR로 생성');
+          
+          // 로컬 QR 편집을 위한 데이터 생성
+          const bankAccount = {
+            accountId: editingQrCode.bankAccount?.accountId || Crypto.randomUUID(),
+            bankName: selectedBank,
+            accountNumber,
+            accountHolder,
+            isDefault: false,
+          };
+
+          const qrData = generateQRData(
+            bankAccount,
+            qrId,
+            enableAmount ? Number(amount) : null,
+            enableDiscount && discountType ? discountType : null,
+            enableDiscount && discountValue ? Number(discountValue) : null
+          );
+
+          const updatedQrCode = {
+            ...editingQrCode,
+            qrName,
+            baseAmount: enableAmount ? Number(amount) : null,
+            discountType: enableDiscount && discountType ? discountType : null,
+            discountValue: enableDiscount && discountValue ? Number(discountValue) : null,
+            qrCodeImage: qrData,
+            bankAccount,
+          };
+          
+          if (isRealUser) {
+            // 로그인 사용자: 서버에 저장
+            const savedAccount = await accountsAPI.create({
+              bankName: selectedBank,
+              accountNumber,
+              accountHolder,
+              isDefault: false,
+            });
+            
+            const savedQR = await qrcodesAPI.create({
+              accountId: savedAccount.accountId,
+              qrName,
+              baseAmount: enableAmount ? Number(amount) : null,
+              discountType: enableDiscount && discountType ? discountType : null,
+              discountValue: enableDiscount && discountValue ? Number(discountValue) : null,
+            });
+            
+            // 기존 로컬 QR 삭제
+            await removeLocalQrCode(editingQrCode.qrId);
+            
+            // 서버 QR 목록 새로고침
+            const allQRCodes = await qrcodesAPI.getAll();
+            setQrCodes(allQRCodes);
+            
+            Alert.alert('수정 완료', 'QR코드가 수정되었습니다.', [
+              { text: '확인', onPress: () => navigation.reset({
+                index: 0,
+                routes: [{ name: 'MyQRList' }],
+              })}
+            ]);
+          } else {
+            // 게스트: 로컬 업데이트
+            await updateLocalQrCode(editingQrCode.qrId, updatedQrCode);
+            await loadLocalQrCodes();
+            
+            Alert.alert('수정 완료', 'QR코드가 수정되었습니다.', [
+              { text: '확인', onPress: () => navigation.reset({
+                index: 0,
+                routes: [{ name: 'MyQRList' }],
+              })}
+            ]);
+          }
+        } else {
+          // 서버 QR 편집: 기존 로직 유지
+          console.log('서버 QR 편집 - 서버에 업데이트');
+          
+          // 1. 먼저 계좌 정보를 서버에 저장/업데이트
+          const savedAccount = await accountsAPI.create({
+            bankName: selectedBank,
+            accountNumber,
+            accountHolder,
+            isDefault: false,
+          });
+          console.log('계좌 정보 서버 저장 완료:', savedAccount);
+          
+          // 2. QR 코드 업데이트
+          const updatedQR = await qrcodesAPI.update(editingQrCode.qrId, {
+            accountId: savedAccount.accountId,
+            qrName,
+            baseAmount: enableAmount ? Number(amount) : null,
+            discountType: enableDiscount && discountType ? discountType : null,
+            discountValue: enableDiscount && discountValue ? Number(discountValue) : null,
+          });
+          console.log('QR 코드 서버 업데이트 완료:', updatedQR);
+          
+          // 3. 저장된 QR 목록을 다시 불러오기
+          const allQRCodes = await qrcodesAPI.getAll();
+          setQrCodes(allQRCodes);
+          
+          // 수정 완료 후 QR 목록으로 이동
+          Alert.alert('수정 완료', 'QR코드가 수정되었습니다.', [
+            { text: '확인', onPress: () => navigation.navigate('MyQRList') }
+          ]);
+        }
         
       } else {
         // 생성 모드: 새 QR 코드 생성
@@ -140,9 +238,9 @@ export default function CreateQRScreen() {
         const qrData = generateQRData(
           bankAccount,
           qrId,
-          enableAmount ? Number(amount) : undefined,
-          enableDiscount ? discountType || undefined : undefined,
-          enableDiscount && discountValue ? Number(discountValue) : undefined
+          enableAmount ? Number(amount) : null,
+          enableDiscount && discountType ? discountType : null,
+          enableDiscount && discountValue ? Number(discountValue) : null
         );
 
         console.log('QR 데이터 생성 완료:', qrData);
@@ -151,9 +249,9 @@ export default function CreateQRScreen() {
           qrId,
           qrName,
           accountId: bankAccount.accountId,
-          baseAmount: enableAmount ? Number(amount) : undefined,
-          discountType: enableDiscount ? discountType || undefined : undefined,
-          discountValue: enableDiscount && discountValue ? Number(discountValue) : undefined,
+          baseAmount: enableAmount ? Number(amount) : null,
+          discountType: enableDiscount && discountType ? discountType : null,
+          discountValue: enableDiscount && discountValue ? Number(discountValue) : null,
           createdAt: new Date().toISOString(),
           qrCodeImage: qrData,
           bankAccount,
@@ -180,9 +278,9 @@ export default function CreateQRScreen() {
             const savedQR = await qrcodesAPI.create({
               accountId: savedAccount.accountId,
               qrName,
-              baseAmount: enableAmount ? Number(amount) : undefined,
-              discountType: enableDiscount ? discountType || undefined : undefined,
-              discountValue: enableDiscount && discountValue ? Number(discountValue) : undefined,
+              baseAmount: enableAmount ? Number(amount) : null,
+              discountType: enableDiscount && discountType ? discountType : null,
+              discountValue: enableDiscount && discountValue ? Number(discountValue) : null,
             });
             console.log('QR 코드 서버 저장 완료:', savedQR);
             
@@ -230,7 +328,10 @@ export default function CreateQRScreen() {
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}
-            onPress={() => navigation.goBack()}
+            onPress={() => navigation.reset({
+              index: 0,
+              routes: [{ name: 'MyQRList' }],
+            })}
           >
             <Text style={styles.backButtonText}>‹</Text>
           </TouchableOpacity>

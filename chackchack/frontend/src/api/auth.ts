@@ -9,11 +9,12 @@ export const authAPI = {
     return response.data;
   },
   
-  socialLogin: async (email: string, nickname: string, authProvider: string, deviceToken?: string) => {
+  socialLogin: async (email: string, nickname: string, authProvider: string, socialAccessToken?: string, deviceToken?: string) => {
     const response = await client.post<{ owner: Owner; accessToken: string }>('/auth/login', {
       email,
       nickname,
       authProvider,
+      socialAccessToken,
       deviceToken,
     });
     return response.data;
