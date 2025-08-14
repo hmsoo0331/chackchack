@@ -399,7 +399,7 @@
         <div class="overlay" id="overlay"></div>
 
         <!-- Sidebar -->
-        <aside class="sidebar mobile-hidden" id="sidebar">
+        <aside class="sidebar" id="sidebar">
             <button class="close-btn" id="closeSidebar" style="display: none;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -994,6 +994,26 @@
         mobileMenuBtn.addEventListener('click', openSidebar);
         closeSidebar.addEventListener('click', closeSidebarFunc);
         overlay.addEventListener('click', closeSidebarFunc);
+
+        // 화면 크기에 따른 초기 사이드바 상태 설정
+        function handleResize() {
+            const isMobile = window.innerWidth <= 1024;
+            if (isMobile) {
+                sidebar.classList.add('mobile-hidden');
+                overlay.classList.remove('active');
+                closeSidebar.style.display = 'none';
+            } else {
+                sidebar.classList.remove('mobile-hidden');
+                overlay.classList.remove('active');
+                closeSidebar.style.display = 'none';
+            }
+        }
+
+        // 페이지 로드 시 초기 설정
+        handleResize();
+
+        // 창 크기 변경 시 리사이즈 처리
+        window.addEventListener('resize', handleResize);
 
         // Smooth scrolling for navigation links
         document.querySelectorAll('.nav-item').forEach(link => {
