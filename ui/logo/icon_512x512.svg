@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- 착착 로고 - 512x512 고해상도 버전 -->
+  <!-- 좌상단 -->
+  <rect x="48" y="48" width="184" height="184" rx="32" fill="none" stroke="#94A3B8" stroke-width="20"/>
+  <rect x="88" y="88" width="104" height="104" rx="24" fill="#94A3B8"/>
+  
+  <!-- 우상단 -->
+  <rect x="280" y="48" width="184" height="184" rx="32" fill="none" stroke="#94A3B8" stroke-width="20"/>
+  <rect x="320" y="88" width="104" height="104" rx="24" fill="#94A3B8"/>
+
+  <!-- 좌하단 -->
+  <rect x="48" y="280" width="184" height="184" rx="32" fill="none" stroke="#94A3B8" stroke-width="20"/>
+  <rect x="88" y="320" width="104" height="104" rx="24" fill="#94A3B8"/>
+
+  <!-- 우하단: 포인트 컬러 채움 + 체크 -->
+  <rect x="280" y="280" width="184" height="184" rx="32" fill="#006D77"/>
+  <path d="M312 372 l36 36 68-76" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <title>착착(Chakchak) 앱 아이콘</title>
+  <desc>512x512 고해상도 앱 아이콘 - QR 느낌의 3블록과 우하단 청록 채움. 내부에 화이트 체크로 신뢰/완성의 의미를 강조</desc>
+</svg>

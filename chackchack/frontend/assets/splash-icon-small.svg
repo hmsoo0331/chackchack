@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- 512x512 캔버스에 중앙 배치된 작은 로고 (256 -> 160 크기 감소) -->
+  <rect width="512" height="512" fill="#ffffff"/>
+  
+  <!-- 중앙에 작은 로고 배치 (176~336 = 160x160 영역) -->
+  <g transform="translate(176, 176) scale(0.625)">
+    <!-- D6: 2x2 - 우하단 채움 + 체크 아이콘 -->
+    <!-- 좌상단 -->
+    <rect x="24" y="24" width="92" height="92" rx="16" fill="none" stroke="#94A3B8" stroke-width="10"/>
+    <rect x="44" y="44" width="52" height="52" rx="12" fill="#94A3B8"/>
+    
+    <!-- 우상단 -->
+    <rect x="140" y="24" width="92" height="92" rx="16" fill="none" stroke="#94A3B8" stroke-width="10"/>
+    <rect x="160" y="44" width="52" height="52" rx="12" fill="#94A3B8"/>
+
+    <!-- 좌하단 -->
+    <rect x="24" y="140" width="92" height="92" rx="16" fill="none" stroke="#94A3B8" stroke-width="10"/>
+    <rect x="44" y="160" width="52" height="52" rx="12" fill="#94A3B8"/>
+
+    <!-- 우하단: 포인트 컬러 채움 + 체크 -->
+    <rect x="140" y="140" width="92" height="92" rx="16" fill="#006D77"/>
+    <path d="M156 186 l18 18 34-38" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  
+  <!-- 앱 이름을 로고 하단에 추가 -->
+  <text x="256" y="380" text-anchor="middle" fill="#006D77" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="600">착착</text>
+  
+  <title>착착 스플래시 로고 - 작은 크기</title>
+  <desc>512x512 캔버스에 중앙 배치된 작은 착착 로고</desc>
+</svg>

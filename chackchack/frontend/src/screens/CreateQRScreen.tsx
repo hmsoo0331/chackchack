@@ -347,6 +347,7 @@ export default function CreateQRScreen() {
               focusedField === 'qrName' && styles.focusedInput
             ]}
             placeholder="QR 이름 (예: 카페 결제용)"
+            placeholderTextColor={colors.textDisabled}
             value={qrName}
             onChangeText={setQrName}
             onFocus={() => setFocusedField('qrName')}
@@ -376,6 +377,7 @@ export default function CreateQRScreen() {
               focusedField === 'accountNumber' && styles.focusedInput
             ]}
             placeholder="예: 123456-01-123456"
+            placeholderTextColor={colors.textDisabled}
             value={accountNumber}
             onChangeText={setAccountNumber}
             keyboardType="numeric"
@@ -390,6 +392,7 @@ export default function CreateQRScreen() {
               focusedField === 'accountHolder' && styles.focusedInput
             ]}
             placeholder="예금주 이름을 입력하세요"
+            placeholderTextColor={colors.textDisabled}
             value={accountHolder}
             onChangeText={setAccountHolder}
             onFocus={() => setFocusedField('accountHolder')}
@@ -411,6 +414,7 @@ export default function CreateQRScreen() {
             <TextInput
               style={styles.input}
               placeholder="지정 금액 (원)"
+              placeholderTextColor={colors.textDisabled}
               value={amount}
               onChangeText={setAmount}
               keyboardType="numeric"
@@ -463,6 +467,7 @@ export default function CreateQRScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder={discountType === 'percentage' ? '할인율 (%)' : '할인 금액 (원)'}
+                  placeholderTextColor={colors.textDisabled}
                   value={discountValue}
                   onChangeText={setDiscountValue}
                   keyboardType="numeric"

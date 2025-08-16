@@ -40,10 +40,17 @@
             background: white;
         }
         
+        .app-logo {
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
         .logo {
             font-size: 28px;
             font-weight: 700;
-            color: #212529;
+            color: #006D77;
             margin-bottom: 8px;
         }
         
@@ -128,54 +135,40 @@
             font-family: 'Pretendard', sans-serif;
         }
         
-        /* Primary Button - 카카오페이 */
-        .btn-primary {
-            background: #006D77;
+        /* 토스 브랜드 버튼 */
+        .btn-toss {
+            background: #0064FF;  /* 토스 시그니처 블루 */
             color: white;
-            box-shadow: 0 4px 12px rgba(0, 109, 119, 0.2);
+            box-shadow: 0 4px 12px rgba(0, 100, 255, 0.25);
         }
         
-        .btn-primary:hover {
-            background: #005A63;
+        .btn-toss:hover {
+            background: #0050D8;
             transform: translateY(-1px);
-            box-shadow: 0 6px 16px rgba(0, 109, 119, 0.3);
+            box-shadow: 0 6px 16px rgba(0, 100, 255, 0.35);
         }
         
-        .btn-primary:active {
+        .btn-toss:active {
             transform: translateY(0);
+            background: #0046BE;
         }
         
-        /* Secondary Button - 토스 */
-        .btn-secondary {
-            background: white;
-            color: #006D77;
-            border: 2px solid #006D77;
+        /* 카카오페이 브랜드 버튼 */
+        .btn-kakao {
+            background: #FEE500;  /* 카카오 시그니처 옐로우 */
+            color: #000000;
+            box-shadow: 0 4px 12px rgba(254, 229, 0, 0.3);
         }
         
-        .btn-secondary:hover {
-            background: #F0F8F8;
+        .btn-kakao:hover {
+            background: #FCDE00;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(254, 229, 0, 0.4);
         }
         
-        .btn-secondary:active {
-            background: #E6F5F6;
-        }
-        
-        /* Ghost Button - 알림 */
-        .btn-ghost {
-            background: transparent;
-            color: #868E96;
-            border: 1px solid #DEE2E6;
-            margin-top: auto;
-        }
-        
-        .btn-ghost:hover {
-            background: #F8F9FA;
-            border-color: #CED4DA;
-            color: #495057;
-        }
-        
-        .btn-ghost:active {
-            background: #E9ECEF;
+        .btn-kakao:active {
+            transform: translateY(0);
+            background: #FAD700;
         }
         
         .btn:disabled {
@@ -183,44 +176,6 @@
             cursor: not-allowed;
         }
         
-        /* 성공 메시지 */
-        .success-message {
-            display: none;
-            text-align: center;
-            color: #28A745;
-            font-weight: 500;
-            padding: 12px;
-            background: #D4EDDA;
-            border-radius: 8px;
-            margin: 0 20px;
-            font-size: 14px;
-        }
-        
-        .success-message.show {
-            display: block;
-            animation: slideDown 0.3s ease-out;
-        }
-        
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        /* 광고 영역 */
-        .ad-footer {
-            padding: 20px;
-            text-align: center;
-            color: #ADB5BD;
-            font-size: 12px;
-            background: #F8F9FA;
-            border-top: 1px solid #E9ECEF;
-        }
         
         /* 로딩 상태 */
         .loading {
@@ -284,6 +239,9 @@
 <body>
     <div class="container">
         <div class="header">
+            <div class="app-logo">
+                <img src="chakchak-logo-D6-check.svg" alt="착착 로고" width="80" height="80">
+            </div>
             <h1 class="logo">빠른 송금</h1>
         </div>
         
@@ -316,27 +274,17 @@
             </div>
             
             <div class="button-section">
-                <button class="btn btn-primary" id="kakaoPayBtn" onclick="openKakaoPay()">
-                    카카오페이로 보내기
-                </button>
-                
-                <button class="btn btn-secondary" id="tossBtn" onclick="openToss()">
+                <button class="btn btn-toss" id="tossBtn" onclick="openToss()">
                     토스로 보내기
                 </button>
                 
-                <button class="btn btn-ghost" id="notifyBtn" onclick="notifyPayment()">
-                    사장님께 보냈다고 알리기
+                <button class="btn btn-kakao" id="kakaoPayBtn" onclick="openKakaoPay()">
+                    카카오페이로 보내기
                 </button>
             </div>
             
-            <div class="success-message" id="successMessage">
-                ✅ 사장님께 알림을 보냈습니다!
-            </div>
         </div>
         
-        <div class="ad-footer">
-            광고 영역 (예시)
-        </div>
     </div>
     
     <script>
@@ -427,8 +375,7 @@
             document.getElementById('errorState').style.display = 'none';
             document.getElementById('contentState').style.display = 'block';
             
-            // 알림 버튼 초기 상태를 비활성화로 설정
-            disableNotifyButton();
+            // 알림 기능 제거됨
         }
         
         function showError() {
@@ -483,25 +430,42 @@
                     showCopySuccess();
                     
                     // 알림 버튼 활성화
-                    enableNotifyButton();
+                    // 알림 기능 제거됨
                     
                     // 플랫폼 확인
                     const userAgent = navigator.userAgent || navigator.vendor || window.opera;
                     const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
                     const isAndroid = /android/i.test(userAgent);
                     
-                    // 카카오페이 앱 실행 대신 사용자가 직접 앱을 열도록 안내
-                    // 딥링크가 불안정하므로 자동 실행 제거
+                    // 카카오페이 앱 실행 시도
+                    setTimeout(() => {
+                        try {
+                            // 카카오페이 앱 실행 (송금 화면)
+                            const kakaoPayAppUrl = 'kakaopay://home';
+                            window.location.href = kakaoPayAppUrl;
+                            
+                            // 앱이 설치되어 있지 않은 경우 앱스토어로 이동
+                            setTimeout(() => {
+                                if (isIOS) {
+                                    window.location.href = 'https://apps.apple.com/kr/app/kakaopay/id1464496236';
+                                } else if (isAndroid) {
+                                    window.location.href = 'https://play.google.com/store/apps/details?id=com.kakaopay.app';
+                                }
+                            }, 2000);
+                        } catch (error) {
+                            console.error('카카오페이 앱 실행 실패:', error);
+                        }
+                    }, 1000);
                 } else {
                     // 복사 실패 시 수동 복사 안내
                     showManualCopy(accountNumber, bankName, accountHolder, amount);
-                    // 수동 복사라도 사용자가 복사했다고 가정하고 알림 버튼 활성화
-                    enableNotifyButton();
+                    // 알림 기능 제거됨
+                    // 알림 기능 제거됨
                 }
             }).catch((error) => {
                 console.error('오류 발생:', error);
                 showManualCopy(accountNumber, bankName, accountHolder, amount);
-                enableNotifyButton();
+                // 알림 기능 제거됨
             });
         }
         
@@ -648,7 +612,7 @@
             const tossDeepLink = `supertoss://send?bank=${encodeURIComponent(bankName)}&accountNo=${encodeURIComponent(accountNumber)}${amount ? `&amount=${amount}` : ''}`;
             
             // 알림 버튼 활성화
-            enableNotifyButton();
+            // 알림 기능 제거됨
             
             try {
                 // 딥링크 시도
@@ -673,77 +637,9 @@
             }
         }
         
-        // 알림 버튼 활성화 (송금 앱 이동 버튼을 클릭한 후에만 활성화)
-        function enableNotifyButton() {
-            const notifyBtn = document.getElementById('notifyBtn');
-            if (notifyBtn) {
-                notifyBtn.disabled = false;
-                notifyBtn.style.opacity = '1';
-                notifyBtn.style.cursor = 'pointer';
-                notifyBtn.textContent = '사장님께 보냈다고 알리기';
-                
-                // 버튼 활성화 애니메이션
-                notifyBtn.style.transition = 'all 0.3s ease';
-                notifyBtn.style.transform = 'scale(1.02)';
-                setTimeout(() => {
-                    notifyBtn.style.transform = 'scale(1)';
-                }, 300);
-            }
-        }
+        // 알림 기능 제거됨 - 기능 비활성화됨
         
-        // 페이지 로드 시 알림 버튼 비활성화
-        function disableNotifyButton() {
-            const notifyBtn = document.getElementById('notifyBtn');
-            if (notifyBtn) {
-                notifyBtn.disabled = true;
-                notifyBtn.style.opacity = '0.5';
-                notifyBtn.style.cursor = 'not-allowed';
-                notifyBtn.textContent = '송금 후 알림 가능';
-            }
-        }
-        
-        // 사장님께 알림 보내기
-        async function notifyPayment() {
-            if (!qrId || qrId === 'undefined') {
-                alert('이 QR코드는 알림 기능을 지원하지 않습니다.\n(로그인 없이 생성된 QR코드입니다)');
-                return;
-            }
-            
-            const button = document.getElementById('notifyBtn');
-            button.disabled = true;
-            button.textContent = '알림 전송 중...';
-            
-            try {
-                const response = await fetch(`/notify/${qrId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                });
-                
-                if (response.ok) {
-                    button.textContent = '알림 전송 완료!';
-                    document.getElementById('successMessage').classList.add('show');
-                    
-                    setTimeout(() => {
-                        button.textContent = '사장님께 보냈다고 알리기';
-                        button.disabled = false;
-                        document.getElementById('successMessage').classList.remove('show');
-                    }, 3000);
-                } else if (response.status === 404) {
-                    alert('QR 코드 정보를 찾을 수 없습니다.\n로그인 없이 생성된 QR코드는 알림 기능을 사용할 수 없습니다.');
-                    button.textContent = '사장님께 보냈다고 알리기';
-                    button.disabled = false;
-                } else {
-                    throw new Error('알림 전송 실패');
-                }
-            } catch (error) {
-                console.error('알림 전송 오류:', error);
-                alert('알림 전송에 실패했습니다. 다시 시도해주세요.');
-                button.textContent = '사장님께 보냈다고 알리기';
-                button.disabled = false;
-            }
-        }
+        // 알림 기능이 제거되었습니다 (v1.0.1부터 비활성화)
     </script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 # 착착(ChackChack) API 명세서
 
-**Version**: 1.1  
-**Date**: 2025-08-13  
+**Version**: 1.3  
+**Date**: 2025-08-14  
 **Base URL**: `http://localhost:3000`
 
 ## 개요
@@ -17,6 +17,37 @@
 ---
 
 ## API 엔드포인트
+
+### 🏠 기본 (Basic)
+
+#### 1. 기본 상태 확인
+```http
+GET /
+```
+
+**Response:**
+```json
+{
+  "message": "Hello World!"
+}
+```
+
+#### 2. 결제 페이지 리다이렉트
+```http
+GET /pay?qrId=:qrId&bank=:bank&account=:account&holder=:holder&amount=:amount
+```
+
+**Query Parameters:**
+- `qrId`: QR코드 ID (선택)
+- `bank`: 은행명
+- `account`: 계좌번호
+- `holder`: 예금주명
+- `amount`: 금액 (선택)
+
+**Response:**
+- 302 Redirect to `/payer.html` with query parameters
+
+---
 
 ### 🔐 인증 (Authentication)
 
@@ -272,7 +303,53 @@ GET /qrcodes/:id
 }
 ```
 
-#### 4. QR코드 삭제
+#### 4. QR코드 수정 ✨ v1.3 신규
+```http
+PUT /qrcodes/:id
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "accountId": "uuid",
+  "qrName": "string",
+  "baseAmount": 10000,
+  "discountType": "percentage|fixed",
+  "discountValue": 10
+}
+```
+
+**Response:**
+```json
+{
+  "qrId": "uuid",
+  "ownerId": "uuid",
+  "accountId": "uuid",
+  "qrName": "string",
+  "baseAmount": 10000,
+  "discountType": "percentage",
+  "discountValue": 10,
+  "styleConfigJson": null,
+  "createdAt": "ISO 8601",
+  "bankAccount": {
+    "accountId": "uuid",
+    "bankName": "string",
+    "accountNumber": "string",
+    "accountHolder": "string",
+    "isDefault": boolean
+  },
+  "qrCodeImage": "data:image/png;base64,..."
+}
+```
+
+**에러 응답:**
+- **404**: QR코드를 찾을 수 없음
+- **403**: 본인의 QR코드가 아님
+- **400**: 잘못된 요청 데이터
+
+#### 5. QR코드 삭제
 ```http
 DELETE /qrcodes/:id
 Authorization: Bearer <token>
@@ -289,7 +366,7 @@ Authorization: Bearer <token>
 - **404**: QR코드를 찾을 수 없음
 - **403**: 본인의 QR코드가 아님
 
-#### 5. QR코드 동기화
+#### 6. QR코드 동기화
 ```http
 POST /qrcodes/sync
 Authorization: Bearer <token>
@@ -437,6 +514,14 @@ Authorization: Bearer <token>
 ---
 
 ## 변경 이력
+
+### Version 1.3 (2025-08-14)
+- **QR코드 수정 API 추가**: `PUT /qrcodes/:id` (기존 QR코드 전체 정보 수정 가능)
+- **기본 엔드포인트 추가**: `GET /` (서버 상태 확인용)
+- **결제 페이지 리다이렉트 추가**: `GET /pay` (payer.html로 자동 리다이렉트)
+- **RESTful 설계 완성**: QR코드 Full CRUD (Create, Read, Update, Delete) 지원
+- **편집 기능 지원**: 모든 QR 정보(이름, 계좌, 금액, 할인) 수정 가능
+- **소유자 권한 검증**: 편집/삭제 시 본인 소유 QR코드만 접근 가능
 
 ### Version 1.1 (2025-08-13)
 - **QR코드 동기화 API 추가**: `POST /qrcodes/sync` (로컬 데이터를 서버와 병합)

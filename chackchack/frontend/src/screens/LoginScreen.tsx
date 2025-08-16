@@ -19,11 +19,11 @@ import { qrcodesAPI } from '../api/qrcodes';
 import { accountsAPI } from '../api/accounts';
 import { colors, typography, spacing, borderRadius } from '../theme';
 import { signInWithKakao } from '../services/kakaoAuth';
-import { signInWithKakaoWeb } from '../services/kakaoAuthWeb';
-import { signInWithKakaoDirect } from '../services/kakaoAuthDirect';
-import { signInWithKakaoCustom } from '../services/kakaoAuthCustom';
-import { signInWithKakaoReal } from '../services/kakaoAuthReal';
-import { checkRedirectUri } from '../utils/checkRedirectUri';
+import { features } from '../config/environment';
+// Mock 로그인은 개발 환경에서만 import
+const signInWithKakaoCustom = features.enableMockLogin 
+  ? require('../services/kakaoAuthCustom').signInWithKakaoCustom 
+  : null;
 
 const ChakchakLogo = ({ size = 60 }) => (
   <Svg width={size} height={size} viewBox="0 0 256 256" fill="none">
@@ -139,57 +139,61 @@ export default function LoginScreen() {
       console.log('카카오 로그인 시작...');
       
       // 실제 카카오 OAuth 로그인 시도
-      let kakaoResult = await signInWithKakaoReal();
+      let kakaoResult = await signInWithKakao();
       
-      // 실제 로그인이 실패하면 Mock 로그인으로 폴백
+      // 로그인 실패 처리
       if (!kakaoResult.success) {
-        console.log('실제 카카오 로그인 실패, 폴백 처리 중...', kakaoResult.error);
+        console.error('카카오 로그인 실패:', kakaoResult.error);
         
-        if (kakaoResult.error === 'EXPO_AUTH_PROXY_ERROR') {
-          console.log('Expo Auth 프록시 이슈 발생 - Mock 로그인으로 전환');
+        // 개발 환경에서만 Mock 로그인 폴백 제공
+        if (features.enableMockLogin && signInWithKakaoCustom) {
+          console.log('개발 환경: Mock 로그인으로 폴백 시도');
           
-          // Mock 로그인으로 폴백
-          kakaoResult = await signInWithKakaoCustom();
+          const mockChoice = await new Promise((resolve) => {
+            Alert.alert(
+              '개발 모드',
+              'Expo Go 환경에서는 실제 카카오 로그인이 제한됩니다.\nMock 로그인을 사용하시겠습니까?',
+              [
+                { text: '취소', onPress: () => resolve(false), style: 'cancel' },
+                { text: 'Mock 로그인 사용', onPress: () => resolve(true) }
+              ]
+            );
+          });
           
-          if (!kakaoResult.success) {
-            throw new Error('카카오 로그인 및 Mock 로그인 모두 실패');
+          if (mockChoice) {
+            kakaoResult = await signInWithKakaoCustom();
+            if (!kakaoResult.success) {
+              throw new Error('Mock 로그인도 실패했습니다.');
+            }
+          } else {
+            return; // 사용자가 취소
           }
-          
-          console.log('Mock 로그인으로 성공적으로 전환됨');
-          
-          // Mock 데이터 사용 알림
-          Alert.alert(
-            '개발 모드',
-            'Expo Go 환경 제약으로 Mock 데이터로 로그인됩니다.\n실제 앱에서는 정상적인 카카오 로그인이 작동합니다.',
-            [{ text: '확인' }]
-          );
         } else {
-          // 다른 에러의 경우도 Mock으로 폴백 시도
-          console.log('다른 에러로 인한 폴백 시도:', kakaoResult.error);
+          // 프로덕션 환경: 사용자 친화적 에러 메시지
+          let errorMessage = '카카오 로그인에 실패했습니다.';
           
-          kakaoResult = await signInWithKakaoCustom();
-          
-          if (!kakaoResult.success) {
-            throw new Error(kakaoResult.error || '카카오 로그인 실패');
+          if (kakaoResult.error?.includes('KOE')) {
+            if (kakaoResult.error.includes('KOE006')) {
+              errorMessage = '앱 설정 오류가 발생했습니다.\n잠시 후 다시 시도해주세요.';
+            } else if (kakaoResult.error.includes('KOE101')) {
+              errorMessage = '앱 인증 정보가 올바르지 않습니다.';
+            }
+          } else if (kakaoResult.error === 'USER_CANCELLED') {
+            console.log('사용자가 로그인을 취소했습니다.');
+            return;
           }
           
           Alert.alert(
-            '로그인 방식 변경',
-            '일시적인 문제로 Mock 로그인을 사용합니다.',
-            [{ text: '확인' }]
+            '로그인 실패',
+            errorMessage,
+            [{ text: '확인', style: 'default' }]
           );
+          return;
         }
       }
 
-      // 실제 카카오 로그인 성공 시 알림
-      if (kakaoResult.success && !kakaoResult.isMock) {
-        console.log('실제 카카오 로그인 성공! 🎉');
-        Alert.alert(
-          '로그인 성공',
-          '카카오 계정으로 성공적으로 로그인되었습니다!',
-          [{ text: '확인' }]
-        );
-      }
+      // 카카오 로그인 성공
+      console.log('카카오 로그인 성공! 🎉');
 
       // 카카오 사용자 정보 추출
       const { userInfo, accessToken: kakaoAccessToken } = kakaoResult;

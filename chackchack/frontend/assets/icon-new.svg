@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+  <!-- 1024x1024 앱 아이콘용 캔버스 -->
+  <rect width="1024" height="1024" rx="180" fill="#ffffff"/>
+  
+  <!-- 중앙에 로고 배치 (312~712 = 400x400 영역) -->
+  <g transform="translate(312, 312) scale(1.5625)">
+    <!-- D6: 2x2 - 우하단 채움 + 체크 아이콘 -->
+    <!-- 좌상단 -->
+    <rect x="24" y="24" width="92" height="92" rx="16" fill="none" stroke="#94A3B8" stroke-width="10"/>
+    <rect x="44" y="44" width="52" height="52" rx="12" fill="#94A3B8"/>
+    
+    <!-- 우상단 -->
+    <rect x="140" y="24" width="92" height="92" rx="16" fill="none" stroke="#94A3B8" stroke-width="10"/>
+    <rect x="160" y="44" width="52" height="52" rx="12" fill="#94A3B8"/>
+
+    <!-- 좌하단 -->
+    <rect x="24" y="140" width="92" height="92" rx="16" fill="none" stroke="#94A3B8" stroke-width="10"/>
+    <rect x="44" y="160" width="52" height="52" rx="12" fill="#94A3B8"/>
+
+    <!-- 우하단: 포인트 컬러 채움 + 체크 -->
+    <rect x="140" y="140" width="92" height="92" rx="16" fill="#006D77"/>
+    <path d="M156 186 l18 18 34-38" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  
+  <title>착착 앱 아이콘</title>
+  <desc>1024x1024 앱 아이콘용 착착 로고</desc>
+</svg>
