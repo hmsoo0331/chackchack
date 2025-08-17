@@ -15,10 +15,16 @@ if (Platform.OS === 'android') {
 const KAKAO_REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY;
 
 // 환경별 Redirect URI 설정
-import { config } from '../config/environment';
+import Constants from 'expo-constants';
 
-// 카카오 개발자센터에 이 URI를 등록해야 함
-const REDIRECT_URI = config.kakaoRedirectUri;
+// Expo Go vs Standalone 앱 구분
+const isExpoGo = Constants.appOwnership === 'expo';
+const isStandalone = Constants.appOwnership === 'standalone' || !Constants.appOwnership;
+
+// 카카오 개발자센터에 이 URI들을 등록해야 함
+// Expo Go: https://auth.expo.io/@hmsoo0331/chackchack
+// Standalone: chackchack://oauth
+const REDIRECT_URI = isStandalone ? 'chackchack://oauth' : 'https://auth.expo.io/@hmsoo0331/chackchack';
 
 // 개발 환경 확인용
 const DEBUG_REDIRECT_URI = AuthSession.makeRedirectUri({
@@ -171,27 +177,50 @@ export const signInWithKakao = async () => {
         }
       });
 
-      // WebBrowser로 카카오 로그인 페이지 열기
-      WebBrowser.openBrowserAsync(authUrl).then(() => {
-        // 브라우저가 열린 후, 사용자가 로그인하고 돌아오기를 기다림
-        console.log('브라우저에서 카카오 로그인 진행 중...');
-        
-        // 타임아웃 설정 (5분)
-        setTimeout(() => {
+      // Standalone 앱에서는 외부 브라우저 사용
+      if (isStandalone) {
+        // 외부 브라우저로 열기
+        Linking.openURL(authUrl).then(() => {
+          console.log('외부 브라우저에서 카카오 로그인 진행 중...');
+          
+          // 타임아웃 설정 (5분)
+          setTimeout(() => {
+            linkingSubscription?.remove();
+            resolve({
+              success: false,
+              error: 'TIMEOUT',
+            });
+          }, 300000);
+        }).catch((error) => {
           linkingSubscription?.remove();
+          console.error('브라우저 열기 실패:', error);
           resolve({
             success: false,
-            error: 'TIMEOUT',
+            error: 'BROWSER_OPEN_FAILED',
           });
-        }, 300000);
-      }).catch((error) => {
-        linkingSubscription?.remove();
-        console.error('브라우저 열기 실패:', error);
-        resolve({
-          success: false,
-          error: 'BROWSER_OPEN_FAILED',
         });
-      });
+      } else {
+        // Expo Go에서는 WebBrowser 사용
+        WebBrowser.openBrowserAsync(authUrl).then(() => {
+          console.log('브라우저에서 카카오 로그인 진행 중...');
+          
+          // 타임아웃 설정 (5분)
+          setTimeout(() => {
+            linkingSubscription?.remove();
+            resolve({
+              success: false,
+              error: 'TIMEOUT',
+            });
+          }, 300000);
+        }).catch((error) => {
+          linkingSubscription?.remove();
+          console.error('브라우저 열기 실패:', error);
+          resolve({
+            success: false,
+            error: 'BROWSER_OPEN_FAILED',
+          });
+        });
+      }
     });
   } catch (error) {
     console.error('카카오 로그인 오류:', error);
