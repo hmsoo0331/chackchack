@@ -210,12 +210,14 @@ export default function LoginScreen() {
       });
 
       // 백엔드로 소셜 로그인 정보 전송
+      console.log('백엔드 소셜 로그인 API 호출 중...', { email, nickname, provider: 'kakao' });
       const authResult = await authAPI.socialLogin(
         email,
         nickname,
         'kakao',
         kakaoAccessToken // 카카오 액세스 토큰도 함께 전송
       );
+      console.log('백엔드 소셜 로그인 성공:', authResult);
 
       // 앱 상태 업데이트
       await setAuth(authResult.accessToken, authResult.owner);

@@ -2,6 +2,7 @@ import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 // WebBrowser 결과 완료 처리
 WebBrowser.maybeCompleteAuthSession();
@@ -13,37 +14,31 @@ if (Platform.OS === 'android') {
 
 // 카카오 OAuth 설정
 const KAKAO_REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY;
+const KAKAO_AUTH_URL = 'https://kauth.kakao.com/oauth';
+const KAKAO_API_URL = 'https://kapi.kakao.com';
 
-// 환경별 Redirect URI 설정
-import Constants from 'expo-constants';
+// 카카오 개발자센터에 등록된 URI (HTTP/HTTPS만 허용)
+// 백엔드 서버의 OAuth 콜백 페이지 사용
+const SERVER_URL = process.env.EXPO_PUBLIC_API_URL || 'http://3.39.96.52:3000';
+const REDIRECT_URI = `${SERVER_URL}/oauth-callback.html`;
 
-// Expo Go vs Standalone 앱 구분
-const isExpoGo = Constants.appOwnership === 'expo';
+console.log('SERVER_URL:', SERVER_URL);
+console.log('REDIRECT_URI:', REDIRECT_URI);
+
+// 앱 환경 확인
 const isStandalone = Constants.appOwnership === 'standalone' || !Constants.appOwnership;
 
-// 카카오 개발자센터에 이 URI들을 등록해야 함
-// Expo Go: https://auth.expo.io/@hmsoo0331/chackchack
-// Standalone: chackchack://oauth
-const REDIRECT_URI = isStandalone ? 'chackchack://oauth' : 'https://auth.expo.io/@hmsoo0331/chackchack';
-
-// 개발 환경 확인용
-const DEBUG_REDIRECT_URI = AuthSession.makeRedirectUri({
-  useProxy: true,
-});
-
 console.log('Kakao REST API Key:', KAKAO_REST_API_KEY);
-console.log('Kakao Redirect URI (Used):', REDIRECT_URI);
-console.log('Debug Redirect URI:', DEBUG_REDIRECT_URI);
+console.log('Kakao Redirect URI:', REDIRECT_URI);
+console.log('App Ownership:', Constants.appOwnership);
+console.log('Is Standalone:', isStandalone);
 
-// 카카오 OAuth URL
-const KAKAO_AUTH_URL = 'https://kauth.kakao.com/oauth';
-
+// 타입 정의
 interface KakaoTokenResponse {
   access_token: string;
   token_type: string;
   refresh_token?: string;
   expires_in: number;
-  scope?: string;
   refresh_token_expires_in?: number;
 }
 
@@ -56,15 +51,13 @@ interface KakaoUserInfo {
     thumbnail_image?: string;
   };
   kakao_account?: {
-    profile_nickname_needs_agreement?: boolean;
-    profile_image_needs_agreement?: boolean;
+    profile_needs_agreement?: boolean;
     profile?: {
       nickname?: string;
       thumbnail_image_url?: string;
       profile_image_url?: string;
       is_default_image?: boolean;
     };
-    has_email?: boolean;
     email_needs_agreement?: boolean;
     is_email_valid?: boolean;
     is_email_verified?: boolean;
@@ -73,7 +66,7 @@ interface KakaoUserInfo {
 }
 
 /**
- * 카카오 로그인 처리 - WebBrowser와 Linking 직접 사용
+ * 카카오 로그인 처리 - WebBrowser와 Linking 사용
  */
 export const signInWithKakao = async () => {
   try {
@@ -86,142 +79,132 @@ export const signInWithKakao = async () => {
       };
     }
 
-    console.log('Starting Kakao OAuth with WebBrowser:', {
-      clientId: KAKAO_REST_API_KEY,
-      redirectUri: REDIRECT_URI,
-    });
+    console.log('Starting Kakao OAuth with WebBrowser + Linking...');
 
-    // 상태값 생성
+    // 랜덤 state 생성
     const state = Math.random().toString(36).substring(7);
     
     // 카카오 OAuth URL 생성
-    const authUrl = `${KAKAO_AUTH_URL}/authorize?` + 
-      `client_id=${KAKAO_REST_API_KEY}&` +
-      `redirect_uri=${encodeURIComponent(REDIRECT_URI)}&` +
-      `response_type=code&` +
-      `state=${state}`;
+    const authUrl = `${KAKAO_AUTH_URL}/authorize?` + new URLSearchParams({
+      client_id: KAKAO_REST_API_KEY,
+      redirect_uri: REDIRECT_URI,
+      response_type: 'code',
+      state,
+    }).toString();
 
-    console.log('카카오 OAuth URL:', authUrl);
+    console.log('Opening Kakao auth URL:', authUrl);
 
-    // Promise로 리다이렉트 처리
-    return new Promise((resolve) => {
-      // 리다이렉트 URL 대기 설정
-      const linkingSubscription = Linking.addEventListener('url', (event) => {
-        console.log('딥링크 수신:', event.url);
+    // 딥링크 처리를 위한 Promise
+    const authCodePromise = new Promise<{ code?: string; error?: string }>((resolve) => {
+      // 딥링크 리스너 설정
+      const handleUrl = (url: string) => {
+        console.log('Received deep link URL:', url);
         
-        // chackchack:// 스킴으로 돌아왔을 때 처리
-        if (event.url && event.url.startsWith('chackchack://')) {
-          linkingSubscription?.remove();
+        if (url.startsWith('chackchack://oauth')) {
+          const urlParams = new URLSearchParams(url.split('?')[1]);
+          const code = urlParams.get('code');
+          const error = urlParams.get('error');
+          const receivedState = urlParams.get('state');
           
-          try {
-            const url = new URL(event.url);
-            const code = url.searchParams.get('code');
-            const error = url.searchParams.get('error');
-            const returnedState = url.searchParams.get('state');
-            
-            if (error) {
-              console.error('카카오 OAuth 에러:', error);
-              resolve({
-                success: false,
-                error: `KAKAO_OAUTH_ERROR: ${error}`,
-              });
-              return;
-            }
-            
-            if (returnedState !== state) {
-              console.error('상태값 불일치');
-              resolve({
-                success: false,
-                error: 'STATE_MISMATCH',
-              });
-              return;
-            }
-            
-            if (!code) {
-              console.error('인증 코드가 없습니다.');
-              resolve({
-                success: false,
-                error: 'NO_AUTH_CODE',
-              });
-              return;
-            }
-            
-            console.log('인증 코드 획득:', code);
-            
-            // 인증 코드로 액세스 토큰 교환
-            exchangeCodeForToken(code, REDIRECT_URI).then((tokenResponse) => {
-              if (tokenResponse) {
-                // 사용자 정보 가져오기
-                fetchKakaoUserInfo(tokenResponse.access_token).then((userInfo) => {
-                  resolve({
-                    success: true,
-                    accessToken: tokenResponse.access_token,
-                    refreshToken: tokenResponse.refresh_token,
-                    userInfo,
-                  });
-                });
-              } else {
-                resolve({
-                  success: false,
-                  error: 'TOKEN_EXCHANGE_FAILED',
-                });
-              }
-            });
-          } catch (error) {
-            console.error('URL 파싱 오류:', error);
-            resolve({
-              success: false,
-              error: 'URL_PARSE_ERROR',
-            });
+          console.log('Deep link params:', { code: code ? 'received' : 'none', error, state: receivedState });
+          
+          if (receivedState === state || !receivedState) { // state가 없는 경우도 허용
+            subscription.remove();
+            resolve({ code: code || undefined, error: error || undefined });
           }
+        }
+      };
+
+      // 리스너 등록
+      const subscription = Linking.addEventListener('url', (event) => {
+        handleUrl(event.url);
+      });
+
+      // 기존 URL 체크 (앱이 이미 열려있는 경우)
+      Linking.getInitialURL().then((url) => {
+        if (url) {
+          handleUrl(url);
         }
       });
 
-      // Standalone 앱에서는 외부 브라우저 사용
-      if (isStandalone) {
-        // 외부 브라우저로 열기
-        Linking.openURL(authUrl).then(() => {
-          console.log('외부 브라우저에서 카카오 로그인 진행 중...');
-          
-          // 타임아웃 설정 (5분)
-          setTimeout(() => {
-            linkingSubscription?.remove();
-            resolve({
-              success: false,
-              error: 'TIMEOUT',
-            });
-          }, 300000);
-        }).catch((error) => {
-          linkingSubscription?.remove();
-          console.error('브라우저 열기 실패:', error);
-          resolve({
-            success: false,
-            error: 'BROWSER_OPEN_FAILED',
-          });
-        });
-      } else {
-        // Expo Go에서는 WebBrowser 사용
-        WebBrowser.openBrowserAsync(authUrl).then(() => {
-          console.log('브라우저에서 카카오 로그인 진행 중...');
-          
-          // 타임아웃 설정 (5분)
-          setTimeout(() => {
-            linkingSubscription?.remove();
-            resolve({
-              success: false,
-              error: 'TIMEOUT',
-            });
-          }, 300000);
-        }).catch((error) => {
-          linkingSubscription?.remove();
-          console.error('브라우저 열기 실패:', error);
-          resolve({
-            success: false,
-            error: 'BROWSER_OPEN_FAILED',
-          });
-        });
-      }
+      // 타임아웃 설정 (5분)
+      setTimeout(() => {
+        subscription.remove();
+        resolve({ error: 'TIMEOUT' });
+      }, 300000);
     });
+
+    // 브라우저 열기
+    const browserResult = await WebBrowser.openAuthSessionAsync(authUrl, 'chackchack://oauth');
+    
+    console.log('Browser result:', browserResult);
+
+    // 브라우저가 성공적으로 열렸거나 dismiss된 경우 딥링크 대기
+    if (browserResult.type === 'success' || browserResult.type === 'dismiss') {
+      const authResult = await authCodePromise;
+      
+      if (authResult.error) {
+        console.error('카카오 OAuth 에러:', authResult.error);
+        return {
+          success: false,
+          error: authResult.error,
+        };
+      }
+      
+      if (!authResult.code) {
+        console.error('인증 코드가 없습니다.');
+        return {
+          success: false,
+          error: 'NO_AUTH_CODE',
+        };
+      }
+      
+      console.log('인증 코드 획득:', authResult.code);
+      
+      // 인증 코드로 액세스 토큰 교환
+      console.log('토큰 교환 시작 - 인증 코드:', authResult.code);
+      const tokenResponse = await exchangeCodeForToken(authResult.code);
+      
+      if (tokenResponse) {
+        console.log('토큰 교환 성공, 사용자 정보 요청 중...');
+        // 사용자 정보 가져오기
+        const userInfo = await fetchKakaoUserInfo(tokenResponse.access_token);
+        
+        if (userInfo) {
+          console.log('카카오 사용자 정보 조회 성공:', { id: userInfo.id, nickname: userInfo.properties?.nickname });
+          return {
+            success: true,
+            accessToken: tokenResponse.access_token,
+            refreshToken: tokenResponse.refresh_token,
+            userInfo,
+          };
+        } else {
+          console.error('카카오 사용자 정보 조회 실패');
+          return {
+            success: false,
+            error: 'KAKAO_USER_INFO_FAILED',
+          };
+        }
+      } else {
+        console.error('토큰 교환 실패');
+        return {
+          success: false,
+          error: 'TOKEN_EXCHANGE_FAILED',
+        };
+      }
+    } else if (browserResult.type === 'cancel') {
+      console.log('카카오 로그인 취소됨');
+      return {
+        success: false,
+        error: 'USER_CANCELLED',
+      };
+    }
+
+    console.error('예상치 못한 브라우저 결과:', browserResult);
+    return {
+      success: false,
+      error: 'UNKNOWN_ERROR',
+    };
   } catch (error) {
     console.error('카카오 로그인 오류:', error);
     return {
@@ -234,17 +217,25 @@ export const signInWithKakao = async () => {
 /**
  * 인증 코드를 액세스 토큰으로 교환
  */
-const exchangeCodeForToken = async (code: string, redirectUri?: string): Promise<KakaoTokenResponse | null> => {
+const exchangeCodeForToken = async (code: string): Promise<KakaoTokenResponse | null> => {
   try {
     const tokenUrl = `${KAKAO_AUTH_URL}/token`;
     
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
       client_id: KAKAO_REST_API_KEY!,
-      redirect_uri: redirectUri || REDIRECT_URI,
+      redirect_uri: REDIRECT_URI,
       code,
     });
 
+    console.log('토큰 교환 요청:', tokenUrl);
+    console.log('토큰 교환 파라미터:', {
+      grant_type: 'authorization_code',
+      client_id: KAKAO_REST_API_KEY!,
+      redirect_uri: REDIRECT_URI,
+      code: code.substring(0, 10) + '...', // 보안을 위해 일부만 표시
+    });
+    
     const response = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
@@ -253,18 +244,18 @@ const exchangeCodeForToken = async (code: string, redirectUri?: string): Promise
       body: params.toString(),
     });
 
+    const data = await response.json();
+    
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error('토큰 교환 실패:', errorData);
+      console.error('토큰 교환 실패 상태:', response.status);
+      console.error('토큰 교환 실패 응답:', data);
       return null;
     }
-
-    const tokenData: KakaoTokenResponse = await response.json();
-    console.log('토큰 교환 성공');
     
-    return tokenData;
+    console.log('토큰 교환 성공! 액세스 토큰 획득');
+    return data as KakaoTokenResponse;
   } catch (error) {
-    console.error('토큰 교환 오류:', error);
+    console.error('토큰 교환 네트워크 오류:', error);
     return null;
   }
 };
@@ -274,26 +265,25 @@ const exchangeCodeForToken = async (code: string, redirectUri?: string): Promise
  */
 const fetchKakaoUserInfo = async (accessToken: string): Promise<KakaoUserInfo | null> => {
   try {
-    const response = await fetch('https://kapi.kakao.com/v2/user/me', {
-      method: 'GET',
+    const userInfoUrl = `${KAKAO_API_URL}/v2/user/me`;
+    
+    const response = await fetch(userInfoUrl, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+        'Authorization': `Bearer ${accessToken}`,
       },
     });
 
+    const data = await response.json();
+    
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error('사용자 정보 조회 실패:', errorData);
+      console.error('사용자 정보 가져오기 실패:', data);
       return null;
     }
-
-    const userInfo: KakaoUserInfo = await response.json();
-    console.log('카카오 사용자 정보:', userInfo);
     
-    return userInfo;
+    console.log('사용자 정보 가져오기 성공');
+    return data as KakaoUserInfo;
   } catch (error) {
-    console.error('사용자 정보 조회 오류:', error);
+    console.error('사용자 정보 가져오기 오류:', error);
     return null;
   }
 };
@@ -303,45 +293,26 @@ const fetchKakaoUserInfo = async (accessToken: string): Promise<KakaoUserInfo | 
  */
 export const signOutFromKakao = async (accessToken: string) => {
   try {
-    const response = await fetch('https://kapi.kakao.com/v1/user/logout', {
+    const logoutUrl = `${KAKAO_API_URL}/v1/user/logout`;
+    
+    const response = await fetch(logoutUrl, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        'Authorization': `Bearer ${accessToken}`,
       },
     });
 
-    if (response.ok) {
-      console.log('카카오 로그아웃 성공');
-      return true;
+    const data = await response.json();
+    
+    if (!response.ok) {
+      console.error('로그아웃 실패:', data);
+      return false;
     }
-
-    return false;
+    
+    console.log('카카오 로그아웃 성공');
+    return true;
   } catch (error) {
     console.error('카카오 로그아웃 오류:', error);
-    return false;
-  }
-};
-
-/**
- * 카카오 연결 끊기 (회원 탈퇴)
- */
-export const unlinkKakaoAccount = async (accessToken: string) => {
-  try {
-    const response = await fetch('https://kapi.kakao.com/v1/user/unlink', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    if (response.ok) {
-      console.log('카카오 연결 끊기 성공');
-      return true;
-    }
-
-    return false;
-  } catch (error) {
-    console.error('카카오 연결 끊기 오류:', error);
     return false;
   }
 };

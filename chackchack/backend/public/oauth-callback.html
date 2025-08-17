@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>착착 - 로그인 처리 중</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+        }
+        .logo {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 2rem;
+            background: white;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+        }
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 3px solid white;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .message {
+            font-size: 18px;
+            margin-top: 20px;
+        }
+        .sub-message {
+            font-size: 14px;
+            margin-top: 10px;
+            opacity: 0.8;
+        }
+        .error {
+            background: #ff4444;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .button {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .button:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">💳</div>
+        <div class="spinner"></div>
+        <div class="message">로그인 처리 중입니다...</div>
+        <div class="sub-message">잠시만 기다려주세요</div>
+        <div id="error-container"></div>
+    </div>
+
+    <script>
+        // URL 파라미터 파싱
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const error = urlParams.get('error');
+        const state = urlParams.get('state');
+        
+        console.log('OAuth Callback:', { code, error, state });
+        
+        if (error) {
+            // 에러 처리
+            document.getElementById('error-container').innerHTML = `
+                <div class="error">
+                    <p>로그인 중 오류가 발생했습니다.</p>
+                    <p>오류: ${error}</p>
+                    <a href="chackchack://oauth?error=${error}" class="button">앱으로 돌아가기</a>
+                </div>
+            `;
+            
+            // 3초 후 자동으로 앱으로 이동 시도
+            setTimeout(() => {
+                window.location.href = `chackchack://oauth?error=${error}`;
+            }, 3000);
+        } else if (code) {
+            // 성공 - 앱으로 리다이렉트
+            const redirectUrl = `chackchack://oauth?code=${code}&state=${state || ''}`;
+            
+            // 즉시 앱으로 이동 시도
+            window.location.href = redirectUrl;
+            
+            // 앱이 설치되어 있지 않은 경우를 위한 메시지
+            setTimeout(() => {
+                document.querySelector('.message').textContent = '앱으로 이동 중...';
+                document.querySelector('.sub-message').innerHTML = `
+                    앱이 자동으로 열리지 않으면 
+                    <a href="${redirectUrl}" style="color: white; text-decoration: underline;">여기를 클릭</a>하세요.
+                `;
+            }, 1000);
+            
+            // 5초 후에도 페이지에 남아있으면 수동 버튼 표시
+            setTimeout(() => {
+                document.getElementById('error-container').innerHTML = `
+                    <a href="${redirectUrl}" class="button">앱으로 이동</a>
+                `;
+            }, 5000);
+        } else {
+            // 파라미터가 없는 경우
+            document.getElementById('error-container').innerHTML = `
+                <div class="error">
+                    <p>잘못된 요청입니다.</p>
+                    <a href="chackchack://" class="button">앱으로 돌아가기</a>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
