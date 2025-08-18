@@ -1,33 +1,42 @@
-# Dependencies
-node_modules/
-
-# Expo
-.expo/
-dist/
-
-# Native
-*.keystore
-*.p8
-*.p12
-*.key
-*.mobileprovision
-
-# Local
-.env*
-
-# Logs
+# 빌드에서 제외할 파일들
+.git
+.vscode
+.idea
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# OS
+# OS 관련 파일
 .DS_Store
-*.tgz
+Thumbs.db
 
-# IDE
-.vscode/
-.idea/
-
-# Temporary
+# 임시 파일
 *.tmp
 *.temp
+.cache
+
+# 테스트 파일
+__tests__
+*.test.js
+*.test.ts
+*.test.tsx
+
+# 문서 및 마크다운  
+*.md
+README.md
+docs/
+
+# 빌드 산출물
+dist/
+build/
+out/
+
+# APK 파일들 (프로젝트 루트에 있는 것들)
+../../../*.apk
+../../../*.aab
+../../../*.apks
+
+# keystore 파일들
+*.keystore
+credentials.json

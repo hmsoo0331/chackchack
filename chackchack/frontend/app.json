@@ -28,9 +28,18 @@
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.ACCESS_MEDIA_LOCATION",
-        "android.permission.INTERNET"
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
       ],
       "usesCleartextTraffic": true,
+      "networkSecurityConfig": {
+        "cleartextTrafficPermitted": true,
+        "domainConfig": {
+          "3.39.96.52": {
+            "cleartextTrafficPermitted": true
+          }
+        }
+      },
       "intentFilters": [
         {
           "action": "VIEW",
