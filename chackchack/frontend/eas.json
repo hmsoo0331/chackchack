@@ -15,7 +15,7 @@
       },
       "env": {
         "NODE_ENV": "production",
-        "EXPO_PUBLIC_API_URL": "http://3.39.96.52:3000",
+        "EXPO_PUBLIC_API_URL": "https://api.chackchack.co.kr",
         "EXPO_PUBLIC_KAKAO_REST_API_KEY": "59c2d66ca38802a0850eccde7da4a597",
         "EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY": "6b016d71ce5ad1c2b457a87013388800",
         "EXPO_PUBLIC_KAKAO_JAVASCRIPT_KEY": "971f3aac1092af4f9c28a72f3bd02493"
@@ -28,7 +28,7 @@
       },
       "env": {
         "NODE_ENV": "production",
-        "EXPO_PUBLIC_API_URL": "http://3.39.96.52:3000",
+        "EXPO_PUBLIC_API_URL": "https://api.chackchack.co.kr",
         "EXPO_PUBLIC_KAKAO_REST_API_KEY": "59c2d66ca38802a0850eccde7da4a597",
         "EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY": "6b016d71ce5ad1c2b457a87013388800",
         "EXPO_PUBLIC_KAKAO_JAVASCRIPT_KEY": "971f3aac1092af4f9c28a72f3bd02493"
