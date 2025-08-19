@@ -202,8 +202,9 @@ export default function MyQRListScreen() {
               // 서버에 계정 삭제 요청
               await authAPI.deleteAccount();
               
-              // 로컬 상태 초기화
-              await storeLogout();
+              // 로컬 데이터 모두 삭제
+              const { clearAllData } = useStore.getState();
+              await clearAllData();
               
               // 더보기 메뉴 닫기
               setShowMoreMenu(false);
@@ -215,7 +216,7 @@ export default function MyQRListScreen() {
                   {
                     text: '확인',
                     onPress: () => {
-                      // 홈 화면으로 이동
+                      // 로그인 화면으로 이동
                       navigation.reset({
                         index: 0,
                         routes: [{ name: 'Home' }],

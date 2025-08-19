@@ -139,7 +139,7 @@ export default function QRCompleteScreen() {
     navigation.navigate('CreateQR', { editingQrCode: qrCode });
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     Alert.alert(
       'QR코드 삭제',
       '정말로 이 QR코드를 삭제하시겠습니까?',
@@ -151,13 +151,31 @@ export default function QRCompleteScreen() {
         {
           text: '삭제',
           style: 'destructive',
-          onPress: () => {
-            Alert.alert('삭제 완료', 'QR코드가 삭제되었습니다.');
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'MyQRList' }],
-            });
-            // TODO: 실제 삭제 로직 구현
+          onPress: async () => {
+            try {
+              // 서버에서 QR 삭제
+              if (qrCode.qrId) {
+                await qrcodesAPI.delete(qrCode.qrId);
+              }
+              
+              // 로컬 스토어에서도 삭제
+              if (qrCode.qrId) {
+                await removeLocalQrCode(qrCode.qrId);
+              }
+              
+              // 서버에서 최신 QR 목록 가져오기
+              const updatedQRCodes = await qrcodesAPI.getAll();
+              setQrCodes(updatedQRCodes);
+              
+              Alert.alert('삭제 완료', 'QR코드가 삭제되었습니다.');
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'MyQRList' }],
+              });
+            } catch (error) {
+              console.error('QR 삭제 실패:', error);
+              Alert.alert('오류', 'QR코드 삭제에 실패했습니다.');
+            }
           },
         },
       ]
