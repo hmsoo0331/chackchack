@@ -1,4 +1,4 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Request, Delete } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Request, Delete, Get } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CreateGuestDto } from './dto/create-guest.dto';
 import { SocialLoginDto } from './dto/social-login.dto';
@@ -30,6 +30,20 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async logout(@Request() req) {
     return this.authService.logout(req.user.ownerId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('privacy-consent')
+  @HttpCode(HttpStatus.OK)
+  async updatePrivacyConsent(@Request() req) {
+    return this.authService.updatePrivacyConsent(req.user.ownerId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('privacy-consent')
+  @HttpCode(HttpStatus.OK)
+  async getPrivacyConsentStatus(@Request() req) {
+    return this.authService.getPrivacyConsentStatus(req.user.ownerId);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -66,17 +66,9 @@ export class QrCodesService {
   }
 
   async generateQrCodeImage(qrCode: QrCode): Promise<string> {
-    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
-    let paymentUrl = `${baseUrl}/payer.html?qrId=${qrCode.qrId}&bank=${encodeURIComponent(qrCode.bankAccount.bankName)}&account=${encodeURIComponent(qrCode.bankAccount.accountNumber)}&holder=${encodeURIComponent(qrCode.bankAccount.accountHolder)}`;
-    
-    if (qrCode.baseAmount) {
-      const finalAmount = this.calculateFinalAmount(
-        qrCode.baseAmount,
-        qrCode.discountType,
-        qrCode.discountValue,
-      );
-      paymentUrl += `&amount=${finalAmount}`;
-    }
+    const baseUrl = process.env.BASE_URL || 'https://api.chackchack.co.kr';
+    // QR ID만 사용하여 보안 강화 (예금주 이름 URL 노출 방지)
+    const paymentUrl = `${baseUrl}/payer.html?qrId=${qrCode.qrId}`;
 
     try {
       const qrCodeDataUrl = await QRCodeLib.toDataURL(paymentUrl, {

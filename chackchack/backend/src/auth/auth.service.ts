@@ -1,8 +1,11 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Owner } from '../entities/owner.entity';
+import { BankAccount } from '../entities/bank-account.entity';
+import { QrCode } from '../entities/qr-code.entity';
+import { PaymentNotification } from '../entities/payment-notification.entity';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -10,7 +13,14 @@ export class AuthService {
   constructor(
     @InjectRepository(Owner)
     private ownerRepository: Repository<Owner>,
+    @InjectRepository(BankAccount)
+    private bankAccountRepository: Repository<BankAccount>,
+    @InjectRepository(QrCode)
+    private qrCodeRepository: Repository<QrCode>,
+    @InjectRepository(PaymentNotification)
+    private paymentNotificationRepository: Repository<PaymentNotification>,
     private jwtService: JwtService,
+    private dataSource: DataSource,
   ) {}
 
   async createGuestOwner(deviceToken?: string): Promise<{ owner: Owner; accessToken: string }> {
@@ -76,17 +86,71 @@ export class AuthService {
     return { message: 'Logout successful' };
   }
 
-  async deleteAccount(ownerId: string): Promise<{ message: string }> {
-    // 사용자 존재 확인
+  async updatePrivacyConsent(ownerId: string): Promise<{ message: string }> {
     const owner = await this.ownerRepository.findOne({ where: { ownerId } });
     if (!owner) {
       throw new UnauthorizedException('User not found');
     }
 
-    // CASCADE 설정으로 관련 데이터도 함께 삭제됩니다
-    // 순서: PaymentNotifications → QrCodes → BankAccounts → Owner
-    await this.ownerRepository.delete(ownerId);
+    await this.ownerRepository.update(ownerId, {
+      isPrivacyConsentGiven: true,
+      privacyConsentDate: new Date(),
+    });
+
+    return { message: 'Privacy consent updated successfully' };
+  }
+
+  async getPrivacyConsentStatus(ownerId: string): Promise<{ isConsentGiven: boolean; consentDate?: Date }> {
+    const owner = await this.ownerRepository.findOne({ 
+      where: { ownerId },
+      select: ['isPrivacyConsentGiven', 'privacyConsentDate']
+    });
     
-    return { message: 'Account deleted successfully' };
+    if (!owner) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return {
+      isConsentGiven: owner.isPrivacyConsentGiven,
+      consentDate: owner.privacyConsentDate,
+    };
+  }
+
+  async deleteAccount(ownerId: string): Promise<{ message: string }> {
+    // 트랜잭션으로 안전하게 처리
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 사용자 존재 확인
+      const owner = await queryRunner.manager.findOne(Owner, { where: { ownerId } });
+      if (!owner) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      // 1. 먼저 PaymentNotifications 삭제 (QrCode를 참조)
+      const qrCodes = await queryRunner.manager.find(QrCode, { where: { owner: { ownerId } } });
+      for (const qr of qrCodes) {
+        await queryRunner.manager.delete(PaymentNotification, { qrCode: { qrId: qr.qrId } });
+      }
+
+      // 2. QrCodes 삭제 (BankAccount를 참조)
+      await queryRunner.manager.delete(QrCode, { owner: { ownerId } });
+
+      // 3. BankAccounts 삭제 (Owner를 참조)
+      await queryRunner.manager.delete(BankAccount, { owner: { ownerId } });
+
+      // 4. 마지막으로 Owner 삭제
+      await queryRunner.manager.delete(Owner, { ownerId });
+
+      await queryRunner.commitTransaction();
+      return { message: 'Account deleted successfully' };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 }

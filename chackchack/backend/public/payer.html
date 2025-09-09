@@ -171,6 +171,35 @@
             background: #FAD700;
         }
         
+        /* 계좌번호 복사 버튼 - 착착 시그니처 색상 */
+        .btn-copy {
+            background: #006D77;  /* 착착 시그니처 그린 */
+            color: white;
+            margin-top: 12px;
+            box-shadow: 0 4px 12px rgba(0, 109, 119, 0.25);
+        }
+        
+        .btn-copy:hover {
+            background: #005A65;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(0, 109, 119, 0.35);
+        }
+        
+        .btn-copy:active {
+            transform: translateY(0);
+            background: #004B54;
+        }
+        
+        /* 복사 완료 상태 */
+        .btn-copy.copied {
+            background: #27AE60;
+            pointer-events: none;
+        }
+        
+        .btn-copy.copied::after {
+            content: ' ✓';
+        }
+        
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
@@ -195,7 +224,36 @@
             animation: spin 1s linear infinite;
         }
         
+        /* 버튼 로딩 스피너 */
+        .btn-loading {
+            position: relative;
+            pointer-events: none;
+        }
+        
+        .btn-loading::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            top: 50%;
+            left: 50%;
+            margin-left: -10px;
+            margin-top: -10px;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: btn-spin 1s linear infinite;
+        }
+        
+        .btn-loading span {
+            visibility: hidden;
+        }
+        
         @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        @keyframes btn-spin {
             to { transform: rotate(360deg); }
         }
         
@@ -271,6 +329,18 @@
                     <span class="info-label">보낼 금액</span>
                     <span class="info-value amount" id="amount">-</span>
                 </div>
+                <div class="info-row" id="discountRow" style="display: none;">
+                    <span class="info-label">할인</span>
+                    <span class="info-value" id="discount" style="color: #E74C3C; font-weight: 600;">-</span>
+                </div>
+                <div class="info-row" id="inputAmountRow" style="display: none;">
+                    <span class="info-label">상품 금액</span>
+                    <input type="number" id="inputAmount" placeholder="금액을 입력하세요" style="border: 2px solid #DEE2E6; border-radius: 8px; padding: 12px; font-size: 16px; text-align: right; width: 200px; outline: none;" oninput="calculateDiscountedAmount()">
+                </div>
+                <div class="info-row" id="finalAmountRow" style="display: none;">
+                    <span class="info-label">최종 보낼 금액</span>
+                    <span class="info-value amount" id="finalAmount">-</span>
+                </div>
             </div>
             
             <div class="button-section">
@@ -281,6 +351,10 @@
                 <button class="btn btn-kakao" id="kakaoPayBtn" onclick="openKakaoPay()">
                     카카오페이로 보내기
                 </button>
+                
+                <button class="btn btn-copy" id="copyBtn" onclick="copyAccountNumber()">
+                    계좌번호 복사하기
+                </button>
             </div>
             
         </div>
@@ -290,6 +364,7 @@
     <script>
         // 전역 변수
         let qrCodeData = null;
+        let calculatedAmount = null;
         const urlParams = new URLSearchParams(window.location.search);
         const qrId = urlParams.get('qrId');
         
@@ -325,12 +400,14 @@
             }
         }
         
-        // URL 파라미터에서 정보 로드
+        // URL 파라미터에서 정보 로드 (레거시 호환용)
         function loadFromURLParams() {
             const bankName = urlParams.get('bank');
             const accountNumber = urlParams.get('account');
             const accountHolder = urlParams.get('holder');
             const amount = urlParams.get('amount');
+            const discountType = urlParams.get('discountType');
+            const discountValue = urlParams.get('discountValue');
             
             if (bankName && accountNumber && accountHolder) {
                 qrCodeData = {
@@ -339,7 +416,9 @@
                         accountNumber: accountNumber,
                         accountHolder: accountHolder
                     },
-                    baseAmount: amount ? parseInt(amount) : null
+                    baseAmount: amount ? parseInt(amount) : null,
+                    discountType: discountType || null,
+                    discountValue: discountValue ? parseFloat(discountValue) : null
                 };
                 
                 displayQRCodeData(qrCodeData);
@@ -349,18 +428,106 @@
             }
         }
         
+        // 예금주 이름 마스킹 함수
+        function maskAccountHolderName(name) {
+            if (!name || name.length < 2) {
+                return name;
+            }
+
+            const length = name.length;
+            
+            if (length === 2) {
+                // 2글자: 한수 → 한*
+                return name[0] + '*';
+            } else if (length === 3) {
+                // 3글자: 한명수 → 한*수
+                return name[0] + '*' + name[2];
+            } else {
+                // 4글자 이상: 남궁명수 → 남**수, 홍길동김 → 홍**김
+                const firstChar = name[0];
+                const lastChar = name[length - 1];
+                const middleLength = length - 2;
+                const maskedMiddle = '*'.repeat(middleLength);
+                
+                return firstChar + maskedMiddle + lastChar;
+            }
+        }
+
         // QR 코드 데이터 표시
         function displayQRCodeData(data) {
             if (data.bankAccount) {
-                document.getElementById('accountHolder').textContent = data.bankAccount.accountHolder;
+                // 예금주 이름 마스킹 처리
+                const maskedAccountHolder = maskAccountHolderName(data.bankAccount.accountHolder);
+                document.getElementById('accountHolder').textContent = maskedAccountHolder;
                 document.getElementById('bankName').textContent = data.bankAccount.bankName;
                 document.getElementById('accountNumber').textContent = data.bankAccount.accountNumber;
             }
             
-            if (data.baseAmount) {
+            // 금액 + 할인 케이스 (둘 다 있는 경우)
+            if (data.baseAmount && data.discountType && data.discountValue) {
+                const finalAmount = calculateFinalAmount(data.baseAmount, data.discountType, data.discountValue);
                 document.getElementById('amountRow').style.display = 'flex';
-                document.getElementById('amount').textContent = data.baseAmount.toLocaleString() + '원';
+                document.getElementById('amount').textContent = Math.floor(finalAmount).toLocaleString() + '원';
+                calculatedAmount = Math.floor(finalAmount);
+                
+                // 할인 정보 표시
+                document.getElementById('discountRow').style.display = 'flex';
+                const discountText = data.discountType === 'percentage' 
+                    ? `${data.discountValue}% 할인` 
+                    : `${Math.floor(data.discountValue).toLocaleString()}원 할인`;
+                document.getElementById('discount').textContent = discountText;
             }
+            // 금액만 있는 케이스
+            else if (data.baseAmount) {
+                document.getElementById('amountRow').style.display = 'flex';
+                document.getElementById('amount').textContent = Math.floor(data.baseAmount).toLocaleString() + '원';
+                calculatedAmount = Math.floor(data.baseAmount);
+            }
+            // 할인만 있는 케이스 (금액 입력 필요)
+            else if (data.discountType && data.discountValue) {
+                document.getElementById('inputAmountRow').style.display = 'flex';
+                document.getElementById('discountRow').style.display = 'flex';
+                document.getElementById('finalAmountRow').style.display = 'flex';
+                
+                const discountText = data.discountType === 'percentage' 
+                    ? `${data.discountValue}% 할인` 
+                    : `${Math.floor(data.discountValue).toLocaleString()}원 할인`;
+                document.getElementById('discount').textContent = discountText;
+                
+                // 버튼 비활성화
+                document.getElementById('tossBtn').disabled = true;
+                document.getElementById('kakaoPayBtn').disabled = true;
+            }
+        }
+        
+        // 할인 적용 금액 계산
+        function calculateFinalAmount(baseAmount, discountType, discountValue) {
+            if (discountType === 'percentage') {
+                return baseAmount * (1 - discountValue / 100);
+            } else {
+                return baseAmount - discountValue;
+            }
+        }
+        
+        // 할인 계산 (사용자 입력 시)
+        function calculateDiscountedAmount() {
+            const inputAmount = parseFloat(document.getElementById('inputAmount').value);
+            
+            if (!inputAmount || inputAmount <= 0) {
+                document.getElementById('finalAmount').textContent = '-';
+                document.getElementById('tossBtn').disabled = true;
+                document.getElementById('kakaoPayBtn').disabled = true;
+                calculatedAmount = null;
+                return;
+            }
+            
+            const finalAmount = calculateFinalAmount(inputAmount, qrCodeData.discountType, qrCodeData.discountValue);
+            document.getElementById('finalAmount').textContent = Math.floor(Math.max(0, finalAmount)).toLocaleString() + '원';
+            calculatedAmount = Math.floor(Math.max(0, finalAmount));
+            
+            // 버튼 활성화
+            document.getElementById('tossBtn').disabled = false;
+            document.getElementById('kakaoPayBtn').disabled = false;
         }
         
         // UI 상태 관리
@@ -392,7 +559,8 @@
             }
             
             const { bankName, accountNumber, accountHolder } = qrCodeData.bankAccount;
-            const amount = qrCodeData.baseAmount || '';
+            const maskedAccountHolder = maskAccountHolderName(accountHolder);
+            const amount = calculatedAmount || qrCodeData.baseAmount || '';
             
             // 계좌번호 복사 함수
             const copyToClipboard = async (text) => {
@@ -432,39 +600,27 @@
                     // 알림 버튼 활성화
                     // 알림 기능 제거됨
                     
-                    // 플랫폼 확인
-                    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-                    const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
-                    const isAndroid = /android/i.test(userAgent);
-                    
                     // 카카오페이 앱 실행 시도
                     setTimeout(() => {
-                        try {
-                            // 카카오페이 앱 실행 (송금 화면)
-                            const kakaoPayAppUrl = 'kakaopay://home';
-                            window.location.href = kakaoPayAppUrl;
-                            
-                            // 앱이 설치되어 있지 않은 경우 앱스토어로 이동
-                            setTimeout(() => {
-                                if (isIOS) {
-                                    window.location.href = 'https://apps.apple.com/kr/app/kakaopay/id1464496236';
-                                } else if (isAndroid) {
-                                    window.location.href = 'https://play.google.com/store/apps/details?id=com.kakaopay.app';
-                                }
-                            }, 2000);
-                        } catch (error) {
-                            console.error('카카오페이 앱 실행 실패:', error);
-                        }
+                        // 카카오페이 앱 실행 (송금 화면)
+                        const kakaoPayAppUrl = 'kakaopay://home';
+                        
+                        // 앱 실행 또는 스토어 이동
+                        openAppOrStore(
+                            kakaoPayAppUrl,
+                            'https://play.google.com/store/apps/details?id=com.kakaopay.app',
+                            'https://apps.apple.com/kr/app/kakaopay/id1464496236'
+                        );
                     }, 1000);
                 } else {
                     // 복사 실패 시 수동 복사 안내
-                    showManualCopy(accountNumber, bankName, accountHolder, amount);
+                    showManualCopy(accountNumber, bankName, maskedAccountHolder, amount);
                     // 알림 기능 제거됨
                     // 알림 기능 제거됨
                 }
             }).catch((error) => {
                 console.error('오류 발생:', error);
-                showManualCopy(accountNumber, bankName, accountHolder, amount);
+                showManualCopy(accountNumber, bankName, maskedAccountHolder, amount);
                 // 알림 기능 제거됨
             });
         }
@@ -472,7 +628,8 @@
         // 복사 성공 메시지 표시
         function showCopySuccess() {
             const { bankName, accountNumber, accountHolder } = qrCodeData.bankAccount;
-            const amount = qrCodeData.baseAmount || '';
+            const maskedAccountHolder = maskAccountHolderName(accountHolder);
+            const amount = calculatedAmount || qrCodeData.baseAmount || '';
             
             // 기존 메시지 제거
             const existingMsg = document.getElementById('copySuccessMsg');
@@ -492,6 +649,8 @@
                 border-radius: 16px;
                 z-index: 10000;
                 max-width: 90%;
+                min-width: 320px;
+                width: auto;
                 text-align: center;
                 font-size: 15px;
                 line-height: 1.6;
@@ -504,7 +663,7 @@
                 <div style="margin-bottom: 20px; padding: 16px; background: rgba(255, 255, 255, 0.15); border-radius: 12px; border-left: 4px solid #FFE066;">
                     <div style="font-size: 16px; margin-bottom: 4px;">${bankName}</div>
                     <div style="font-size: 18px; font-weight: 700; font-family: monospace; letter-spacing: 1px; margin-bottom: 4px;">${accountNumber}</div>
-                    <div style="font-size: 14px;">예금주: ${accountHolder}</div>
+                    <div style="font-size: 14px;">예금주: ${maskedAccountHolder}</div>
                     ${amount ? `<div style="margin-top: 8px; color: #FFE066; font-size: 16px; font-weight: 700;">💰 ${amount.toLocaleString()}원</div>` : ''}
                 </div>
                 <div style="padding: 12px; background: rgba(255, 230, 102, 0.2); border-radius: 8px; margin-bottom: 16px;">
@@ -531,7 +690,7 @@
         }
         
         // 수동 복사 안내
-        function showManualCopy(accountNumber, bankName, accountHolder, amount) {
+        function showManualCopy(accountNumber, bankName, maskedAccountHolder, amount) {
             const msgDiv = document.createElement('div');
             msgDiv.style.cssText = `
                 position: fixed;
@@ -562,7 +721,7 @@
                     </div>
                     <div style="margin-bottom: 12px; ${amount ? 'padding-bottom: 8px; border-bottom: 1px solid #DEE2E6;' : ''}">
                         <div style="font-size: 12px; color: #666; margin-bottom: 2px;">예금주</div>
-                        <div style="font-size: 16px; font-weight: 600; color: #333;">${accountHolder}</div>
+                        <div style="font-size: 16px; font-weight: 600; color: #333;">${maskedAccountHolder}</div>
                     </div>
                     ${amount ? `<div>
                         <div style="font-size: 12px; color: #666; margin-bottom: 2px;">금액</div>
@@ -598,7 +757,196 @@
             document.body.appendChild(msgDiv);
         }
         
+        // 앱 실행 또는 스토어 이동 함수
+        function openAppOrStore(appUrl, storeUrlAndroid, storeUrlIOS) {
+            // 플랫폼 확인
+            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+            const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+            const isAndroid = /android/i.test(userAgent);
+            
+            // 현재 시간 기록
+            const startTime = Date.now();
+            let appOpened = false;
+            
+            // visibility change 이벤트로 앱 실행 감지
+            const handleVisibilityChange = function() {
+                if (document.hidden || document.visibilityState === 'hidden') {
+                    appOpened = true;
+                }
+            };
+            
+            // blur 이벤트로 앱 실행 감지 (백업)
+            const handleBlur = function() {
+                appOpened = true;
+            };
+            
+            // 이벤트 리스너 등록
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+            window.addEventListener('blur', handleBlur);
+            window.addEventListener('pagehide', handleBlur);
+            
+            // iframe을 사용한 앱 실행 시도 (더 안정적)
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = appUrl;
+            document.body.appendChild(iframe);
+            
+            // 스토어 이동 타이머
+            const storeTimer = setTimeout(function() {
+                // 이벤트 리스너 제거
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+                window.removeEventListener('blur', handleBlur);
+                window.removeEventListener('pagehide', handleBlur);
+                
+                // iframe 제거
+                if (iframe && iframe.parentNode) {
+                    iframe.parentNode.removeChild(iframe);
+                }
+                
+                // 앱이 열리지 않았고, 페이지가 여전히 활성 상태인 경우에만 스토어로 이동
+                const timeElapsed = Date.now() - startTime;
+                if (!appOpened && !document.hidden && timeElapsed < 3500) {
+                    if (isIOS && storeUrlIOS) {
+                        window.location.href = storeUrlIOS;
+                    } else if (isAndroid && storeUrlAndroid) {
+                        window.location.href = storeUrlAndroid;
+                    } else if (!isIOS && !isAndroid) {
+                        // 데스크톱의 경우
+                        window.open(storeUrlAndroid || storeUrlIOS, '_blank');
+                    }
+                }
+            }, 3000);
+            
+            // 앱이 열리면 타이머 취소
+            setTimeout(function() {
+                if (appOpened) {
+                    clearTimeout(storeTimer);
+                    // 이벤트 리스너 제거
+                    document.removeEventListener('visibilitychange', handleVisibilityChange);
+                    window.removeEventListener('blur', handleBlur);
+                    window.removeEventListener('pagehide', handleBlur);
+                    // iframe 제거
+                    if (iframe && iframe.parentNode) {
+                        iframe.parentNode.removeChild(iframe);
+                    }
+                }
+            }, 1000);
+        }
+        
         // 토스로 보내기
+        // 계좌번호 복사 함수
+        function copyAccountNumber() {
+            if (!qrCodeData || !qrCodeData.bankAccount) {
+                alert('계좌 정보를 불러올 수 없습니다.');
+                return;
+            }
+            
+            const { bankName, accountNumber, accountHolder } = qrCodeData.bankAccount;
+            const maskedAccountHolder = maskAccountHolderName(accountHolder);
+            const textToCopy = accountNumber;
+            
+            // 클립보드 복사
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    const copyBtn = document.getElementById('copyBtn');
+                    const originalText = copyBtn.innerHTML;
+                    
+                    // 복사 완료 표시
+                    copyBtn.classList.add('copied');
+                    copyBtn.innerHTML = '복사 완료';
+                    
+                    // 3초 후 원래대로 복구
+                    setTimeout(() => {
+                        copyBtn.classList.remove('copied');
+                        copyBtn.innerHTML = originalText;
+                    }, 3000);
+                    
+                    // 토스트 메시지 표시
+                    showToast(`계좌번호가 복사되었습니다!\n${bankName} ${accountNumber}`);
+                }).catch(err => {
+                    fallbackCopyTextToClipboard(textToCopy);
+                });
+            } else {
+                fallbackCopyTextToClipboard(textToCopy);
+            }
+        }
+        
+        // 복사 폴백 함수 (구형 브라우저용)
+        function fallbackCopyTextToClipboard(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.top = "-999999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                document.execCommand('copy');
+                const copyBtn = document.getElementById('copyBtn');
+                const originalText = copyBtn.innerHTML;
+                
+                copyBtn.classList.add('copied');
+                copyBtn.innerHTML = '복사 완료';
+                
+                setTimeout(() => {
+                    copyBtn.classList.remove('copied');
+                    copyBtn.innerHTML = originalText;
+                }, 3000);
+                
+                showToast('계좌번호가 복사되었습니다!');
+            } catch (err) {
+                alert('복사에 실패했습니다. 수동으로 복사해주세요.');
+            }
+            
+            document.body.removeChild(textArea);
+        }
+        
+        // 토스트 메시지 표시 함수
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                bottom: 100px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 12px 24px;
+                border-radius: 24px;
+                font-size: 14px;
+                z-index: 10000;
+                animation: fadeInUp 0.3s ease-out;
+            `;
+            toast.textContent = message;
+            
+            // 애니메이션 스타일 추가
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes fadeInUp {
+                    from {
+                        opacity: 0;
+                        transform: translateX(-50%) translateY(20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateX(-50%) translateY(0);
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'fadeInUp 0.3s ease-out reverse';
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                    document.head.removeChild(style);
+                }, 300);
+            }, 3000);
+        }
+        
         function openToss() {
             if (!qrCodeData || !qrCodeData.bankAccount) {
                 alert('계좌 정보를 불러올 수 없습니다.');
@@ -606,35 +954,29 @@
             }
             
             const { bankName, accountNumber, accountHolder } = qrCodeData.bankAccount;
-            const amount = qrCodeData.baseAmount || '';
+            const maskedAccountHolder = maskAccountHolderName(accountHolder);
+            const amount = calculatedAmount || qrCodeData.baseAmount || '';
+            
+            // 버튼 로딩 상태 설정
+            const tossBtn = document.getElementById('tossBtn');
+            tossBtn.classList.add('btn-loading');
+            tossBtn.innerHTML = '<span>토스로 보내기</span>';
             
             // 토스 송금 딥링크 (supertoss:// 스킴 사용)
             const tossDeepLink = `supertoss://send?bank=${encodeURIComponent(bankName)}&accountNo=${encodeURIComponent(accountNumber)}${amount ? `&amount=${amount}` : ''}`;
             
-            // 알림 버튼 활성화
-            // 알림 기능 제거됨
+            // 앱 실행 또는 스토어 이동
+            openAppOrStore(
+                tossDeepLink,
+                'https://play.google.com/store/apps/details?id=viva.republica.toss',
+                'https://apps.apple.com/kr/app/toss/id839333328'
+            );
             
-            try {
-                // 딥링크 시도
-                window.location.href = tossDeepLink;
-                
-                // 토스 앱이 설치되어 있지 않은 경우 앱스토어/플레이스토어로 이동
-                setTimeout(() => {
-                    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-                    const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
-                    const isAndroid = /android/i.test(userAgent);
-                    
-                    if (isIOS) {
-                        window.location.href = 'https://apps.apple.com/kr/app/toss/id839333328';
-                    } else if (isAndroid) {
-                        window.location.href = 'https://play.google.com/store/apps/details?id=viva.republica.toss';
-                    } else {
-                        window.open('https://toss.im', '_blank');
-                    }
-                }, 2000);
-            } catch (error) {
-                console.error('토스 앱 실행 실패:', error);
-            }
+            // 3초 후 로딩 상태 자동 해제
+            setTimeout(() => {
+                tossBtn.classList.remove('btn-loading');
+                tossBtn.innerHTML = '토스로 보내기';
+            }, 3000);
         }
         
         // 알림 기능 제거됨 - 기능 비활성화됨
