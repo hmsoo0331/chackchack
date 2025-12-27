@@ -32,11 +32,84 @@ dist/
 build/
 out/
 
-# APK 파일들 (프로젝트 루트에 있는 것들)
+# APK/AAB 파일들 (모든 위치)
+**/*.apk
+**/*.aab
+**/*.apks
 ../../../*.apk
 ../../../*.aab
 ../../../*.apks
+../../*.apk
+../../*.aab
+../../*.apks
+../apk/
+../../apk/
 
 # keystore 파일들
 *.keystore
 credentials.json
+
+# 대용량 아카이브 및 빌드 파일들
+*.tar.gz
+*.zip
+*.rar
+**/*.tar.gz
+**/*.zip
+**/*.rar
+../../*.tar.gz
+../../*.zip
+../../*.rar
+
+# E2E 테스트 파일들
+e2e-tests/
+
+# iOS 관련 (Android 빌드이므로 불필요)
+ios/
+
+# 개발용 스크립트
+remove-console-logs.js
+
+# Debug 디렉토리들
+debug-*/
+src/debug-*/
+
+# Android 빌드 캐시
+android/.cxx/
+android/app/build/
+android/app/src/debug/
+
+# 컴포넌트 폴더는 필요하므로 제외하지 않음
+# src/components/
+
+# Hermes 아티팩트
+**/hermes-*
+**/Pods/
+
+# 백업 파일들
+*_old.*
+*_backup.*
+*.bak
+
+# Metro 캐시
+metro-cache/
+.expo-shared/
+
+# 환경 파일 (빌드 프로필에서 설정됨)
+.env.local
+.env.development
+
+# 백엔드 폴더 전체 (frontend 빌드에 불필요)
+../backend/
+../../backend/
+
+# 전체 루트 레벨 대용량 파일들
+../../documents/
+../../scripts/
+../../web/
+../../web-deploy.tar.gz
+../../*.html
+../../*.md
+../../RELEASE_*.md
+
+# node_modules 캐시
+.expo/

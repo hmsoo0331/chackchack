@@ -8,7 +8,7 @@ export const authAPI = {
     });
     return response.data;
   },
-  
+
   socialLogin: async (email: string, nickname: string, authProvider: string, socialAccessToken?: string, deviceToken?: string) => {
     const response = await client.post<{ owner: Owner; accessToken: string }>('/auth/login', {
       email,
@@ -22,6 +22,16 @@ export const authAPI = {
 
   logout: async () => {
     const response = await client.post<{ message: string }>('/auth/logout');
+    return response.data;
+  },
+
+  updatePrivacyConsent: async () => {
+    const response = await client.post<{ message: string }>('/auth/privacy-consent');
+    return response.data;
+  },
+
+  getPrivacyConsentStatus: async () => {
+    const response = await client.get<{ isConsentGiven: boolean; consentDate?: string }>('/auth/privacy-consent');
     return response.data;
   },
 

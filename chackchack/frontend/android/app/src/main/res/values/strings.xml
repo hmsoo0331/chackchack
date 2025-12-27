@@ -2,4 +2,5 @@
   <string name="app_name">착착</string>
   <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
   <string name="expo_splash_screen_status_bar_translucent" translatable="false">false</string>
+  <string name="kakao_app_key">6b016d71ce5ad1c2b457a87013388800</string>
 </resources>

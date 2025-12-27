@@ -11,26 +11,20 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import Svg, { Rect, Path } from 'react-native-svg';
-// import { GoogleSignin } from '@react-native-google-signin/google-signin';
-// import KakaoLogins from '@react-native-seoul/kakao-login';
+
 import { useStore } from '../store/useStore';
 import { authAPI } from '../api/auth';
 import { qrcodesAPI } from '../api/qrcodes';
 import { accountsAPI } from '../api/accounts';
 import { colors, typography, spacing, borderRadius } from '../theme';
-import { signInWithKakao } from '../services/kakaoAuth';
-import { features } from '../config/environment';
-// Mock 로그인은 개발 환경에서만 import
-const signInWithKakaoCustom = features.enableMockLogin 
-  ? require('../services/kakaoAuthCustom').signInWithKakaoCustom 
-  : null;
+import kakaoAuth from '../services/kakaoAuth';
 
 const ChakchakLogo = ({ size = 60 }) => (
   <Svg width={size} height={size} viewBox="0 0 256 256" fill="none">
     {/* 좌상단 */}
     <Rect x="24" y="24" width="92" height="92" rx="16" fill="none" stroke="#94A3B8" strokeWidth="10"/>
     <Rect x="44" y="44" width="52" height="52" rx="12" fill="#94A3B8"/>
-    
+
     {/* 우상단 */}
     <Rect x="140" y="24" width="92" height="92" rx="16" fill="none" stroke="#94A3B8" strokeWidth="10"/>
     <Rect x="160" y="44" width="52" height="52" rx="12" fill="#94A3B8"/>
@@ -51,20 +45,23 @@ export default function LoginScreen() {
   const { setAuth, setQrCodes, syncLocalQrCodesToServer } = useStore();
   const qrCodeToSave = route.params?.qrCodeToSave;
 
+
+  /**
+   * QR 코드를 서버에 저장하는 함수
+   */
   const saveQRToServer = async (qrCode: any) => {
     try {
-      console.log('로그인 후 QR 서버 저장 시작...', qrCode);
-      
-      // 1. 먼저 계좌 정보를 서버에 저장
+      console.log('💾 Saving QR code to server...');
+
+      // 1. 계좌 정보를 서버에 저장
       const savedAccount = await accountsAPI.create({
         bankName: qrCode.bankAccount.bankName,
         accountNumber: qrCode.bankAccount.accountNumber,
         accountHolder: qrCode.bankAccount.accountHolder,
         isDefault: false,
       });
-      console.log('계좌 정보 저장 완료:', savedAccount);
-      
-      // 2. 계좌 정보가 저장된 후 QR 코드 저장
+
+      // 2. QR 코드 저장
       const savedQR = await qrcodesAPI.create({
         accountId: savedAccount.accountId,
         qrName: qrCode.qrName,
@@ -72,185 +69,139 @@ export default function LoginScreen() {
         discountType: qrCode.discountType,
         discountValue: qrCode.discountValue,
       });
-      console.log('QR 코드 저장 완료:', savedQR);
-      
-      // 3. 저장된 QR 목록을 다시 불러오기
+
+      // 3. QR 목록 새로고침
       const allQRCodes = await qrcodesAPI.getAll();
       setQrCodes(allQRCodes);
-      
+
       Alert.alert('성공', 'QR코드가 서버에 저장되었습니다.');
     } catch (error) {
-      console.error('QR코드 서버 저장 실패:', error);
-      console.error('에러 상세:', error.response?.data);
-      Alert.alert('오류', `QR코드 저장에 실패했습니다.\n${error.response?.data?.message || error.message}`);
+      console.error('❌ QR save error:', error);
+      Alert.alert(
+        '오류', 
+        `QR코드 저장에 실패했습니다.\n${error.response?.data?.message || error.message}`
+      );
     }
   };
 
+  /**
+   * 로그인 성공 후 처리
+   */
   const handleLoginSuccess = async () => {
-    // 로컬 QR 코드 동기화
     try {
+      console.log('🎯 Processing login success...');
+      
+      // 로컬 QR 코드 동기화
       const syncResult = await syncLocalQrCodesToServer();
       if (syncResult.syncedCount > 0) {
+        console.log(`📋 Synced ${syncResult.syncedCount} QR codes to server`);
         Alert.alert(
           '동기화 완료', 
           `로컬에 저장된 ${syncResult.syncedCount}개의 QR코드가 계정에 추가되었습니다.`,
-          [{ text: '확인', onPress: () => navigation.navigate('MyQRList') }]
+          [{ text: '확인', onPress: () => navigateToMain() }]
         );
         return;
       }
+
+      // QR 코드 저장이 있는 경우
+      if (qrCodeToSave) {
+        await saveQRToServer(qrCodeToSave);
+      }
+
+      navigateToMain();
+      
     } catch (error) {
-      console.error('QR 동기화 실패:', error);
-      // 동기화 실패해도 로그인은 계속 진행
+      console.error('❌ Login success handler error:', error);
+      // 에러가 있어도 메인 화면으로 이동
+      navigateToMain();
     }
-
-    if (qrCodeToSave) {
-      await saveQRToServer(qrCodeToSave);
-    }
-
-    navigation.navigate('MyQRList');
   };
 
-  // 하드웨어 뒤로가기 버튼 제어
+  /**
+   * 메인 화면으로 이동
+   */
+  const navigateToMain = () => {
+    console.log('🚀 Navigating to MyQRList');
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'MyQRList' }],
+    });
+  };
+
+  /**
+   * 하드웨어 뒤로가기 버튼 제어
+   */
   useFocusEffect(
     React.useCallback(() => {
       const onBackPress = () => {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'MyQRList' }],
-        });
+        navigateToMain();
         return true; // 기본 뒤로가기 동작 방지
       };
 
       const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-      
       return () => backHandler.remove();
-    }, [navigation])
+    }, [])
   );
 
-  // 소셜 로그인 초기화 (현재는 mock 버전)
-  // React.useEffect(() => {
-  //   GoogleSignin.configure({
-  //     webClientId: 'YOUR_GOOGLE_WEB_CLIENT_ID',
-  //   });
-  // }, []);
-
+  /**
+   * 카카오 로그인 처리
+   */
   const handleKakaoLogin = async () => {
     try {
-      console.log('카카오 로그인 시작...');
-      
-      // 실제 카카오 OAuth 로그인 시도
-      let kakaoResult = await signInWithKakao();
-      
-      // 로그인 실패 처리
-      if (!kakaoResult.success) {
-        console.error('카카오 로그인 실패:', kakaoResult.error);
-        
-        // 개발 환경에서만 Mock 로그인 폴백 제공
-        if (features.enableMockLogin && signInWithKakaoCustom) {
-          console.log('개발 환경: Mock 로그인으로 폴백 시도');
-          
-          const mockChoice = await new Promise((resolve) => {
-            Alert.alert(
-              '개발 모드',
-              'Expo Go 환경에서는 실제 카카오 로그인이 제한됩니다.\nMock 로그인을 사용하시겠습니까?',
-              [
-                { text: '취소', onPress: () => resolve(false), style: 'cancel' },
-                { text: 'Mock 로그인 사용', onPress: () => resolve(true) }
-              ]
-            );
-          });
-          
-          if (mockChoice) {
-            kakaoResult = await signInWithKakaoCustom();
-            if (!kakaoResult.success) {
-              throw new Error('Mock 로그인도 실패했습니다.');
-            }
-          } else {
-            return; // 사용자가 취소
-          }
-        } else {
-          // 프로덕션 환경: 사용자 친화적 에러 메시지
-          let errorMessage = '카카오 로그인에 실패했습니다.';
-          
-          if (kakaoResult.error?.includes('KOE')) {
-            if (kakaoResult.error.includes('KOE006')) {
-              errorMessage = '앱 설정 오류가 발생했습니다.\n잠시 후 다시 시도해주세요.';
-            } else if (kakaoResult.error.includes('KOE101')) {
-              errorMessage = '앱 인증 정보가 올바르지 않습니다.';
-            }
-          } else if (kakaoResult.error === 'USER_CANCELLED') {
-            console.log('사용자가 로그인을 취소했습니다.');
-            return;
-          }
-          
+      console.log('🚀 [LoginScreen] 카카오 로그인 시작');
+
+      // 카카오 로그인 실행
+      const result = await kakaoAuth.signInWithKakao();
+
+      if (result.success && result.token && result.user) {
+        console.log('✅ [LoginScreen] 카카오 로그인 성공');
+
+        // 앱 상태 업데이트
+        await setAuth(result.token, result.user);
+
+        // 로그인 후 처리
+        await handleLoginSuccess();
+      } else {
+        console.log('❌ [LoginScreen] 카카오 로그인 실패:', result.error);
+
+        // 사용자에게 에러 안내
+        if (result.error && result.error !== '로그인을 취소했습니다.') {
           Alert.alert(
-            '로그인 실패',
-            errorMessage,
-            [{ text: '확인', style: 'default' }]
+            '카카오 로그인 실패',
+            result.error + '\n\n다시 시도하거나 "게스트로 계속하기"를 이용해주세요.',
+            [{ text: '확인' }]
           );
-          return;
         }
       }
-
-      // 카카오 로그인 성공
-      console.log('카카오 로그인 성공! 🎉');
-
-      // 카카오 사용자 정보 추출
-      const { userInfo, accessToken: kakaoAccessToken } = kakaoResult;
-      const email = userInfo?.kakao_account?.email || `kakao_${userInfo?.id}@kakao.com`;
-      const nickname = userInfo?.properties?.nickname || 
-                       userInfo?.kakao_account?.profile?.nickname || 
-                       '카카오 사용자';
-
-      console.log('카카오 로그인 성공:', { 
-        email, 
-        nickname, 
-        isReal: !kakaoResult.isMock,
-        userId: userInfo?.id 
-      });
-
-      // 백엔드로 소셜 로그인 정보 전송
-      console.log('백엔드 소셜 로그인 API 호출 중...', { email, nickname, provider: 'kakao' });
-      const authResult = await authAPI.socialLogin(
-        email,
-        nickname,
-        'kakao',
-        kakaoAccessToken // 카카오 액세스 토큰도 함께 전송
-      );
-      console.log('백엔드 소셜 로그인 성공:', authResult);
-
-      // 앱 상태 업데이트
-      await setAuth(authResult.accessToken, authResult.owner);
-      
-      // 카카오 액세스 토큰 저장 (로그아웃 시 필요)
-      await AsyncStorage.setItem('kakaoAccessToken', kakaoAccessToken);
-      
-      await handleLoginSuccess();
     } catch (error) {
-      console.error('카카오 로그인 에러:', error);
-      
-      // 상세한 에러 메시지 표시
-      const errorMessage = error.message?.includes('Network Error') 
-        ? '네트워크 연결을 확인해주세요.' 
-        : '카카오 로그인에 실패했습니다.';
-        
-      Alert.alert('오류', errorMessage);
+      console.error('❌ [LoginScreen] 카카오 로그인 오류:', error);
+      Alert.alert(
+        '로그인 오류',
+        '카카오 로그인 중 예상치 못한 오류가 발생했습니다.\n다시 시도해주세요.',
+        [{ text: '확인' }]
+      );
     }
   };
 
-  // 네이버, 구글 로그인은 추후 구현 예정
-
+  /**
+   * 게스트로 계속하기
+   */
   const handleGuestContinue = async () => {
     try {
-      console.log('게스트 등록 시작...');
+      console.log('👤 Creating guest account...');
+      
       const result = await authAPI.createGuest();
-      console.log('게스트 등록 성공:', result);
       await setAuth(result.accessToken, result.owner);
-      navigation.navigate('MyQRList');
+      
+      console.log('✅ Guest account created successfully');
+      navigateToMain();
+      
     } catch (error) {
-      console.error('게스트 등록 실패:', error);
-      console.error('에러 세부정보:', error.response?.data);
-      Alert.alert('오류', `게스트 등록에 실패했습니다.\n${error.response?.data?.message || error.message}`);
+      console.error('❌ Guest registration error:', error);
+      Alert.alert(
+        '오류', 
+        `게스트 등록에 실패했습니다.\n${error.response?.data?.message || error.message}`
+      );
     }
   };
 
@@ -259,17 +210,14 @@ export default function LoginScreen() {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigation.reset({
-            index: 0,
-            routes: [{ name: 'MyQRList' }],
-          })}
+          onPress={navigateToMain}
         >
           <Text style={styles.backButtonText}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>로그인</Text>
         <View style={styles.placeholder} />
       </View>
-      
+
       <View style={styles.content}>
         <View style={styles.logoContainer}>
           <ChakchakLogo size={80} />
@@ -294,7 +242,9 @@ export default function LoginScreen() {
                   />
                 </Svg>
               </View>
-              <Text style={[styles.socialButtonText, styles.kakaoButtonText]}>카카오톡으로 시작하기</Text>
+              <Text style={[styles.socialButtonText, styles.kakaoButtonText]}>
+                카카오로 시작하기
+              </Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -338,7 +288,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   placeholder: {
-    width: 40, // backButton과 같은 크기로 중앙 정렬
+    width: 40,
   },
   content: {
     flex: 1,
@@ -381,7 +331,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   kakaoButton: {
-    backgroundColor: '#F7E600', // 채도가 낮은 카카오 노란색
+    backgroundColor: '#F7E600',
     borderWidth: 1,
     borderColor: '#E6D200',
   },
@@ -405,7 +355,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   kakaoButtonText: {
-    color: '#3C1E1E', // 갈색 텍스트
+    color: '#3C1E1E',
     fontWeight: '700',
   },
   guestButton: {

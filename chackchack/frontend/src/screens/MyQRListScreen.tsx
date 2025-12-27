@@ -18,6 +18,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius } from '../theme';
 import * as WebBrowser from 'expo-web-browser';
+import kakaoAuth from '../services/kakaoAuth';
 
 export default function MyQRListScreen() {
   const navigation = useNavigation<any>();
@@ -29,23 +30,28 @@ export default function MyQRListScreen() {
   useFocusEffect(
     React.useCallback(() => {
       const refreshData = async () => {
-        console.log('MyQRListScreen 포커스 - 데이터 새로고침');
-        console.log('인증 상태:', { isAuthenticated, owner });
-        
+        console.log('🔄 MyQRList - Refreshing data...');
+        console.log('📊 Auth state:', { 
+          isAuthenticated, 
+          ownerId: owner?.ownerId, 
+          authProvider: owner?.authProvider 
+        });
+
         // 게스트가 아닌 실제 로그인 사용자만 서버 QR 사용
         const isRealUser = isAuthenticated && owner && owner.authProvider !== 'guest';
-        console.log('isRealUser:', isRealUser);
-        
+        console.log('👤 Is real user:', isRealUser);
+
         if (isRealUser) {
+          console.log('📡 Loading server QR codes...');
           await loadServerQRCodes();
         } else {
-          console.log('로컬 QR 코드 불러오기');
+          console.log('💾 Loading local QR codes...');
           await loadLocalQrCodes();
         }
       };
-      
+
       refreshData();
-    }, [isAuthenticated, owner?.authProvider]) // localQrCodes와 loadLocalQrCodes 제거
+    }, [isAuthenticated, owner?.authProvider])
   );
 
   useEffect(() => {
@@ -57,13 +63,13 @@ export default function MyQRListScreen() {
 
   const loadServerQRCodes = async () => {
     try {
-      console.log('서버 QR 코드 불러오기 시작');
+
       setLoading(true);
       const codes = await qrcodesAPI.getAll();
-      console.log('서버에서 불러온 QR 코드:', codes);
+
       setQrCodes(codes);
     } catch (error) {
-      console.error('서버 QR 코드 불러오기 실패:', error);
+
       Alert.alert('오류', 'QR코드를 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
@@ -73,7 +79,7 @@ export default function MyQRListScreen() {
   // 게스트가 아닌 실제 로그인 사용자만 서버 QR 사용
   const isRealUser = isAuthenticated && owner && owner.authProvider !== 'guest';
   const rawQRCodes = isRealUser ? qrCodes : localQrCodes;
-  
+
   // 추가 안전장치: 중복 제거 (qrId 기준)
   const displayQRCodes = rawQRCodes.reduce((acc: any[], current: any) => {
     const existingIndex = acc.findIndex(item => item.qrId === current.qrId);
@@ -109,7 +115,7 @@ export default function MyQRListScreen() {
                 Alert.alert('삭제 완료', 'QR코드가 삭제되었습니다.');
               }
             } catch (error) {
-              console.error('QR 삭제 오류:', error);
+
               Alert.alert('오류', 'QR코드 삭제에 실패했습니다.');
             }
           },
@@ -136,20 +142,20 @@ export default function MyQRListScreen() {
               if (isRealUser) {
                 await authAPI.logout();
               }
-              
+
               // 로컬 상태 초기화
               await storeLogout();
-              
+
               // 더보기 메뉴 닫기
               setShowMoreMenu(false);
-              
+
               // 홈 화면으로 이동
               navigation.reset({
                 index: 0,
                 routes: [{ name: 'MyQRList' }],
               });
             } catch (error) {
-              console.error('로그아웃 오류:', error);
+
               // 서버 오류가 있어도 로컬 로그아웃은 진행
               await storeLogout();
               setShowMoreMenu(false);
@@ -167,19 +173,18 @@ export default function MyQRListScreen() {
   const handlePrivacyPolicy = async () => {
     try {
       const result = await WebBrowser.openBrowserAsync(
-        'https://hmsoo0331.github.io/chackchack/',
+        'https://chackchack.co.kr/privacy.html',
         {
           presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
           controlsColor: colors.primary,
         }
       );
-      
+
       // 브라우저가 닫힌 후 더보기 메뉴 닫기
       setShowMoreMenu(false);
-      
-      console.log('개인정보처리방침 브라우저 결과:', result);
+
     } catch (error) {
-      console.error('개인정보처리방침 열기 오류:', error);
+
       Alert.alert('오류', '개인정보처리방침을 열 수 없습니다.');
       setShowMoreMenu(false);
     }
@@ -199,16 +204,26 @@ export default function MyQRListScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // 서버에 계정 삭제 요청
+              // 1. 카카오 로그인 사용자인 경우 카카오 연결 해제 시도
+              if (owner?.authProvider === 'kakao') {
+                try {
+                  await kakaoAuth.unlinkKakao();
+                } catch (kakaoError) {
+                  // 카카오 연결 해제 실패해도 계속 진행
+                  console.warn('카카오 연결 해제 실패 (계속 진행):', kakaoError);
+                }
+              }
+
+              // 2. 서버에 계정 삭제 요청
               await authAPI.deleteAccount();
-              
-              // 로컬 데이터 모두 삭제
+
+              // 3. 로컬 데이터 모두 삭제
               const { clearAllData } = useStore.getState();
               await clearAllData();
-              
-              // 더보기 메뉴 닫기
+
+              // 4. 더보기 메뉴 닫기
               setShowMoreMenu(false);
-              
+
               Alert.alert(
                 '탈퇴 완료',
                 '계정이 성공적으로 삭제되었습니다.',
@@ -226,7 +241,6 @@ export default function MyQRListScreen() {
                 ]
               );
             } catch (error) {
-              console.error('계정 삭제 오류:', error);
               Alert.alert('오류', '계정 삭제에 실패했습니다.\n다시 시도해주세요.');
             }
           },
@@ -240,7 +254,7 @@ export default function MyQRListScreen() {
       <TouchableOpacity 
         style={styles.qrContent}
         onPress={() => {
-          console.log('QR 아이템 클릭:', item);
+
           navigation.navigate('QRComplete', { qrCode: item, isNewlyCreated: false });
         }}
       >
@@ -288,7 +302,6 @@ export default function MyQRListScreen() {
       </TouchableOpacity>
     </View>
   );
-
 
   return (
     <SafeAreaView style={styles.container}>
@@ -352,7 +365,7 @@ export default function MyQRListScreen() {
           windowSize={10}
         />
       )}
-      
+
       {/* 더보기 메뉴 모달 */}
       <Modal
         visible={showMoreMenu}
@@ -373,9 +386,22 @@ export default function MyQRListScreen() {
               <Ionicons name="document-text-outline" size={20} color={colors.textSecondary} />
               <Text style={styles.menuItemText}>개인정보처리방침</Text>
             </TouchableOpacity>
-            
+
+            {/* TODO: 향후 구현 예정 - 약관 및 동의 내역 */}
+            {/* 
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={handleTermsAndConsent}
+            >
+              <Ionicons name="checkmark-circle-outline" size={20} color={colors.textSecondary} />
+              <Text style={styles.menuItemText}>약관 및 동의 내역</Text>
+            </TouchableOpacity>
+
             <View style={styles.menuDivider} />
-            
+            */}
+
+            <View style={styles.menuDivider} />
+
             <TouchableOpacity
               style={styles.menuItem}
               onPress={handleLogout}
@@ -383,9 +409,9 @@ export default function MyQRListScreen() {
               <Ionicons name="log-out-outline" size={20} color={colors.textSecondary} />
               <Text style={styles.menuItemLogout}>로그아웃</Text>
             </TouchableOpacity>
-            
+
             <View style={styles.menuDivider} />
-            
+
             <TouchableOpacity
               style={styles.menuItem}
               onPress={handleDeleteAccount}

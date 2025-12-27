@@ -40,6 +40,9 @@ export class QrCode {
   @JoinColumn({ name: 'account_id' })
   bankAccount: BankAccount;
 
-  @OneToMany(() => PaymentNotification, notification => notification.qrCode)
+  @OneToMany(() => PaymentNotification, notification => notification.qrCode, {
+    cascade: ['remove'],
+    onDelete: 'CASCADE'
+  })
   paymentNotifications: PaymentNotification[];
 }

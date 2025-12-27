@@ -20,6 +20,8 @@ erDiagram
         string email
         string nickname  
         string auth_provider
+        boolean is_privacy_consent_given
+        timestamp privacy_consent_date
         timestamp created_at
         timestamp last_login_at
     }
@@ -72,6 +74,8 @@ erDiagram
 | `email` | VARCHAR | NULLABLE | 이메일 (소셜 로그인 시) |
 | `nickname` | VARCHAR | NULLABLE | 닉네임 (소셜 로그인 시) |
 | `auth_provider` | VARCHAR | NULLABLE | 인증 제공자 ('guest', 'kakao', 'naver', 'google') |
+| `is_privacy_consent_given` | BOOLEAN | DEFAULT FALSE | 개인정보 수집 및 이용 동의 여부 ✨ v1.4 |
+| `privacy_consent_date` | TIMESTAMP | NULLABLE | 개인정보 동의 일시 ✨ v1.4 |
 | `created_at` | TIMESTAMP | NOT NULL, DEFAULT NOW() | 생성 일시 |
 | `last_login_at` | TIMESTAMP | NOT NULL, DEFAULT NOW() | 마지막 로그인 일시 |
 
@@ -252,7 +256,11 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 ## 🚀 확장 계획
 
-### v1.1 예정 변경사항
+### v1.4 완료된 변경사항 ✨
+- `owners` 테이블에 `is_privacy_consent_given` 컬럼 추가 (개인정보 동의 여부)
+- `owners` 테이블에 `privacy_consent_date` 컬럼 추가 (동의 일시)
+
+### v1.5 예정 변경사항
 - `qr_codes` 테이블에 `logo_url` 컬럼 추가 (QR 로고)
 - `owners` 테이블에 `push_enabled` 컬럼 추가 (푸시 설정)
 
@@ -293,6 +301,12 @@ pg_dump -t payment_notifications chackchack > notifications_backup.sql
 ---
 
 ## 변경 이력
+
+### Version 1.4 (2025-09-09) ✨
+- **개인정보 동의 기능 추가**: `owners` 테이블에 개인정보 처리 동의 관련 필드 추가
+- `is_privacy_consent_given` 컬럼 추가 (동의 여부 추적)
+- `privacy_consent_date` 컬럼 추가 (동의 일시 기록)
+- 로그인/게스트 사용자 구분하여 동의 정보 관리
 
 ### Version 1.0 (2025-08-13)
 - 초기 ERD 작성

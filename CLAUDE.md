@@ -1,10 +1,11 @@
 # 착착(ChackChack) 프로젝트 상태 및 컨텍스트
 
 ## 프로젝트 개요
-- **버전**: v1.3.1
+- **버전**: v1.0.13 (2025-10-25)
 - **핵심 컨셉**: 로그인 없는 첫 경험을 제공하는 계좌이체 QR코드 생성 앱
 - **대상**: IT 기기 사용이 서툰 소상공인 (사장님)
 - **수익 모델**: 사장님용 앱 무료, 손님 웹페이지 광고 수익
+- **🎯 플레이스토어 제출용 AAB**: `/Users/hanmyungsoo/project/chackchack/apk/chackchack-v1.0.13-version16-final.aab` (버전코드 16)
 
 ## 기술 스택
 
@@ -36,6 +37,8 @@
 ### 인증
 - `POST /auth/guest` - 게스트 계정 생성
 - `POST /auth/login` - 소셜 로그인
+- `POST /auth/logout` - 로그아웃 (인증 필요)
+- `DELETE /auth/me` - 계정 탈퇴 (인증 필요) ✨ v1.0.2 신규
 
 ### 계좌 관리
 - `POST /accounts` - 계좌 추가 (인증 필요)
@@ -54,47 +57,53 @@
 
 ## 주요 화면 구성
 
-### 모바일 앱 (사장님용) - v1.3.1 업데이트
+### 모바일 앱 (사장님용) - v1.0.2 업데이트
 1. **SplashScreen**: 시작 화면, 자동 라우팅
 2. **MyQRListScreen**: 메인 화면, QR 목록 관리
 3. **CreateQRScreen**: QR 생성/편집 폼 ✨ 편집 기능 추가
 4. **QRCompleteScreen**: 생성/조회 완료, 저장/공유/편집 ✨ 갤러리 저장 추가
 5. **LoginScreen**: 소셜 로그인 옵션 ✨ 카카오 완전 구현
 
-### 웹 페이지 (손님용)
-- `/public/payer.html`: QR 스캔 시 보이는 송금 페이지
-- 송금 앱 이동 버튼 클릭 후 '사장님께 알리기' 버튼 활성화
+### 웹 페이지 (손님용) - v1.0.3 업데이트
+- `/public/payer.html`: QR 스캔 시 보이는 송금 페이지 ✨ 7가지 UX/UI 개선 완료
+- 할인만 있는 QR: 상품 금액 입력 → 할인 적용 → 최종 금액 계산
+- 토스/카카오페이 딥링크 최적화, 로딩 상태 표시
+- 금액 표시 개선 (콤마, 소수점 제거)
 
-## v1.3.1 주요 변경사항 ✨ (최신)
-
-### 완성된 기능
-- **QR 갤러리 저장**: ViewShot + MediaLibrary로 휴대폰 갤러리 저장 가능
-- **하드웨어 뒤로가기 제어**: Android 뒤로가기 버튼 완벽 제어
-- **카카오 소셜 로그인**: 실제 OAuth + Mock 폴백으로 완전 구현
-- **개인정보처리방침**: 더보기 메뉴에서 웹브라우저 자동 연동
-- **데이터 처리 개선**: 편집 시 소수점/토글 상태 완벽 처리
-- **네비게이션 최적화**: 편집 후 홈 화면 직접 이동
-
-## v1.3 주요 변경사항 ✨
+## v1.0.3 주요 변경사항 ✨ (2025-08-24)
 
 ### 완성된 기능
+- **손님용 송금 페이지 완전 개선**: 7가지 핵심 UX/UI 이슈 해결
+- **할인 기능 완전 구현**: 할인만 있는 QR에서 금액 입력 및 계산 지원
+- **딥링크 최적화**: 토스 앱에 금액 정보 자동 전달
+- **QR URL 도메인화**: https://api.chackchack.co.kr 도메인 사용
+
+### 손님용 페이지 세부 개선사항
+1. **UI 개선**: 카카오페이 팝업 최소 너비 설정 (320px)
+2. **UX 개선**: 토스 버튼 클릭 시 로딩 스피너 표시
+3. **로직 추가**: 할인만 설정된 QR에서 상품 금액 입력 기능
+4. **버그 수정**: 금액 소수점 제거 및 천 단위 콤마 표시
+5. **버그 수정**: 금액+할인 동시 적용 시 최종 금액 정확 계산
+6. **기능 개선**: 토스 딥링크에 계산된 금액 파라미터 추가
+7. **서버 개선**: QR 생성 URL을 IP에서 도메인으로 변경
+
+## v1.0.2 주요 변경사항 ✨ (2025-08-24)
+
+### 완성된 기능
+- **계정 탈퇴 기능**: 트랜잭션 기반 안전한 데이터 삭제
+- **QR 삭제 버그 수정**: Alert와 Navigation 순서 문제 해결
+- **코드 정리**: 모든 console.log 제거, 프로덕션 최적화
+- **서버 안정성**: 외래키 제약 조건 처리 개선
+
+## v1.0.1 이전 주요 기능
+
+### 완성된 사항
+- **QR 갤러리 저장**: ViewShot + MediaLibrary로 휴대폰 갤러리 저장
+- **카카오 소셜 로그인**: OAuth 2.0 완전 구현
 - **QR 코드 편집**: 모든 정보(이름, 계좌, 금액, 할인) 수정 가능
-- **편집 UI/UX**: 기존 데이터로 자동 입력, 직관적 편집 흐름
-- **PUT API**: RESTful QR 수정 엔드포인트 완성
-- **독립적 토글**: 금액 지정과 할인 설정 개별 제어
-
-## v1.2 주요 변경사항
-
-### 완성된 사항
-- **UX 개선**: 독립적 토글, 메인 화면 최적화
-- **버그 수정**: 할인 정보 표시, 스크롤 기능 추가
-- **라우팅 개선**: HomeScreen 제거, 직접적인 사용자 경험
-
-## v1.1 주요 변경사항
-
-### 완성된 사항
-- **입금 알림 UX 개선**: 송금 앱 이동 버튼 클릭 전까지 알림 버튼 비활성화
-- 버튼 클릭 후 활성화되어 사장님께 푸시 알림 전송
+- **개인정보처리방침**: 더보기 메뉴에서 웹브라우저 연동
+- **HTTPS 설정**: api.chackchack.co.kr 도메인 적용
+- **입금 알림 UX**: 송금 앱 이동 후 알림 버튼 활성화
 
 ## 프로젝트 페르소나
 
@@ -145,8 +154,9 @@ chackchack/
 - ✅ 손님용 송금 페이지
 - ✅ 결제 알림 API
 - ✅ 로컬 스토리지 ↔ 서버 동기화
-- ✅ QR 갤러리 저장 기능 (v1.3.1)
-- ✅ 카카오 소셜 로그인 완전 구현 (v1.3.1)
+- ✅ QR 갤러리 저장 기능
+- ✅ 카카오 소셜 로그인 완전 구현
+- ✅ 계정 탈퇴 기능 (v1.0.2)
 
 ### 진행 중/미구현
 - 🔄 푸시 알림 실제 전송 (FCM/APNS) - API 호출만 구현됨
@@ -173,6 +183,19 @@ npm run android     # Android 에뮬레이터
 npm run web         # 웹 브라우저
 ```
 
+### Android 프로덕션 빌드
+```bash
+cd chackchack/frontend/android
+./gradlew clean                    # 빌드 캐시 정리
+NODE_ENV=production ./gradlew bundleRelease  # AAB 번들 생성
+
+# 빌드 결과 위치:
+# - AAB: ./app/build/outputs/bundle/release/app-release.aab
+# - APK: ./app/build/outputs/apk/release/app-release.apk
+```
+
+**중요**: 빌드 전에 `android/app/build.gradle`에서 `signingConfig signingConfigs.release`가 설정되어 있는지 확인
+
 ## 환경 설정
 
 ### Backend (.env 필요)
@@ -189,7 +212,68 @@ JWT_SECRET=your_jwt_secret
 - API 엔드포인트: `/src/api/client.ts`에서 설정
 - 기본값: `http://localhost:3000`
 
+### 카카오 OAuth 설정 🔑
+**실제 착착(ChackChack) 프로젝트 카카오 앱 키**:
+- **네이티브 앱 키**: `6b016d71ce5ad1c2b457a87013388800` (현재 사용 중 - dooboolab 테스트 키)
+- **REST API 키**: `59c2d66ca38802a0850eccde7da4a597`
+- **JavaScript 키**: `971f3aac1092af4f9c28a72f3bd02493`
+- **어드민 키**: `9080b2e6b969605a5212841e7d728b98`
+
+**⚠️ 현재 상태**:
+- 카카오 개발자 콘솔에서는 "착착(chackchack)"으로 올바르게 등록됨
+- 하지만 로그인 화면에서는 "dooboolab" 표시됨 (원인 불명)
+- 어제까지 정상 작동했으나 오늘 갑자기 발생한 문제
+- 카카오 네이티브 SDK로 완전 재구현 완료 (2025-09-25)
+
+**🔍 문제 분석**:
+- 앱 키 `6b016d71ce5ad1c2b457a87013388800`가 dooboolab과 착착 모두에 연관되어 있을 가능성
+- 또는 카카오 서버 측 캐싱 문제
+
+**✨ TODO**:
+- 새 카카오 앱 생성 후 고유 키 발급 고려
+- 또는 카카오 개발자 지원팀 문의
+
+## 배포 정보
+
+### 서버
+- **API 서버**: https://api.chackchack.co.kr
+- **EC2 인스턴스**: 3.39.96.52 (AWS Seoul Region)
+- **SSL 인증서**: Let's Encrypt 적용
+
+### Android 앱 서명 키스토어 🔑
+- **프로덕션 키스토어**: `chakchak-release.keystore`
+- **위치**: `/chackchack/frontend/chakchak-release.keystore`
+- **패스워드**: `chakchak2024`
+- **키 별칭**: `chakchak`
+- **키 패스워드**: `chakchak2024`
+- **SHA1 지문**: `96:3E:C2:8E:94:A4:EF:11:1E:36:70:DE:41:E2:7C:09:B4:EE:D0:F7`
+
+**⚠️ 중요: 모든 프로덕션 빌드는 반드시 이 키스토어를 사용해야 함**
+
+### 빌드 출력물 관리 📦
+- **중앙화된 빌드 폴더**: `/Users/hanmyungsoo/project/chackchack/apk/`
+- **포함 파일**: 모든 APK, AAB 빌드 결과물
+- **명명 규칙**: `chackchack-v{버전}-{설명}-{날짜}.{apk|aab}`
+- **주요 빌드 방법**:
+  - **EAS Build**: `cd frontend && eas build -p android --profile preview` (권장, 진정한 standalone)
+  - **Gradle Build**: `cd frontend/android && ./gradlew bundleRelease` (로컬 빌드)
+
+### 최신 빌드
+- **🎯 플레이스토어 제출용 AAB v1.0.13**: `/Users/hanmyungsoo/project/chackchack/apk/chackchack-v1.0.13-production-playstore.aab` (51MB)
+- **EAS Build URL**: https://expo.dev/accounts/hanms/projects/chackchack/builds/63ff971f-30d2-4697-9df5-6aec721d7fcf
+- **버전 코드**: 16
+- **빌드 날짜**: 2025-10-25
+- **서명**: 프로덕션 키스토어 (chakchak-release.keystore)
+- **빌드 방식**: EAS Build production 프로필
+- **상태**: ✅ 플레이스토어 제출 준비 완료
+
+### 이전 빌드
+- **프로덕션 AAB v1.0.9**: `/Users/hanmyungsoo/project/chackchack/apk/chackchack-v1.0.9-production-keystore.aab`
+- **최신 Gradle 디버그**: `/Users/hanmyungsoo/project/chackchack/apk/chackchack-debug-gradle-20251025-191416.apk`
+
+**⚠️ 주의**: Gradle로 빌드한 APK는 "Unable to load script" 에러 발생 (Metro 의존성 문제). 진정한 standalone APK는 EAS Build 사용 권장.
+
 ---
 
 *이 문서는 새 세션 시작 시 프로젝트 컨텍스트를 빠르게 파악하기 위한 참고 자료입니다.*
-*최종 업데이트: 2025-08-14 (v1.3.1 갤러리 저장 및 소셜 로그인 완성)*
+*최종 업데이트: 2025-09-24 (v1.0.9 카카오 로그인 재구현 및 서명키 표준화)*

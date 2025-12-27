@@ -11,13 +11,12 @@ import Svg, { Rect, Path } from 'react-native-svg';
 import { colors, typography, spacing } from '../theme';
 import { useStore } from '../store/useStore';
 
-
 const ChakchakLogo = ({ size = 120 }) => (
   <Svg width={size} height={size} viewBox="0 0 256 256" fill="none">
     {/* 좌상단 */}
     <Rect x="24" y="24" width="92" height="92" rx="16" fill="none" stroke="#94A3B8" strokeWidth="10"/>
     <Rect x="44" y="44" width="52" height="52" rx="12" fill="#94A3B8"/>
-    
+
     {/* 우상단 */}
     <Rect x="140" y="24" width="92" height="92" rx="16" fill="none" stroke="#94A3B8" strokeWidth="10"/>
     <Rect x="160" y="44" width="52" height="52" rx="12" fill="#94A3B8"/>
@@ -35,11 +34,11 @@ const ChakchakLogo = ({ size = 120 }) => (
 export default function SplashScreen() {
   const navigation = useNavigation<any>();
   const { loadLocalQrCodes, localQrCodes, qrCodes, isAuthenticated, owner, initializeAuth } = useStore();
-  
+
   // 상태 관리
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [navigationStarted, setNavigationStarted] = useState(false);
-  
+
   // 애니메이션 값들
   const slideUpValue = useRef(new Animated.Value(80)).current;
   const fadeValue = useRef(new Animated.Value(0)).current;
@@ -51,17 +50,19 @@ export default function SplashScreen() {
 
   const initializeApp = async () => {
     try {
-      console.log('앱 초기화 시작');
+      console.log('🚀 Initializing app...');
       
-      await Promise.all([
-        initializeAuth(),
-        loadLocalQrCodes(),
-      ]);
+      // 순차적으로 실행하여 안정성 확보
+      await initializeAuth();
+      console.log('✅ Auth initialized');
       
-      console.log('앱 초기화 완료 - 데이터 로드 완료');
+      await loadLocalQrCodes();
+      console.log('✅ Local QR codes loaded');
+
       setIsDataLoaded(true);
+      console.log('✅ App initialization completed');
     } catch (error) {
-      console.error('앱 초기화 실패:', error);
+      console.error('❌ App initialization error:', error);
       setIsDataLoaded(true);
     }
   };
@@ -70,14 +71,10 @@ export default function SplashScreen() {
   useEffect(() => {
     if (!isDataLoaded || navigationStarted) return;
 
-    console.log('데이터 로딩 완료 - MyQRList로 이동');
-    console.log('인증 상태:', { isAuthenticated, owner: owner?.authProvider });
-    console.log('QR 코드 개수:', { local: localQrCodes.length, server: qrCodes.length });
-    
     setNavigationStarted(true);
-    
+
     // v1.2: 항상 MyQRList로 이동 (HomeScreen 건너뛰기)
-    console.log('스플래시 애니메이션 후 MyQRList로 이동');
+
     startLogoAnimation(() => {
       navigation.reset({
         index: 0,
@@ -110,7 +107,6 @@ export default function SplashScreen() {
     });
   };
 
-
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View
@@ -132,7 +128,7 @@ export default function SplashScreen() {
         >
           <ChakchakLogo size={120} />
         </Animated.View>
-        
+
         <View style={styles.textContainer}>
           <Text style={styles.catchphrase}>착착, QR로 쉬워지는 계좌이체</Text>
         </View>

@@ -19,17 +19,49 @@ import { useStore } from '../store/useStore';
 import { qrcodesAPI } from '../api/qrcodes';
 import { accountsAPI } from '../api/accounts';
 import { colors, typography, spacing, borderRadius } from '../theme';
+import PrintableQRTemplate from '../components/PrintableQRTemplate';
+
+// 예금주 이름 마스킹 함수
+function maskAccountHolderName(name: string | undefined | null): string {
+  // null, undefined, 빈 문자열 처리
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    return '';
+  }
+
+  // 공백 제거
+  const trimmedName = name.trim();
+  const length = trimmedName.length;
+  
+  // 1글자 처리
+  if (length === 1) {
+    return trimmedName;
+  }
+  
+  if (length === 2) {
+    // 2글자: 한수 → 한*
+    return trimmedName[0] + '*';
+  } else if (length === 3) {
+    // 3글자: 한명수 → 한*수
+    return trimmedName[0] + '*' + trimmedName[2];
+  } else {
+    // 4글자 이상: 남궁명수 → 남**수, 홍길동김 → 홍**김
+    const firstChar = trimmedName[0];
+    const lastChar = trimmedName[length - 1];
+    const middleLength = length - 2;
+    const maskedMiddle = '*'.repeat(middleLength);
+    
+    return firstChar + maskedMiddle + lastChar;
+  }
+}
 
 export default function QRCompleteScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { qrCode, isNewlyCreated = false } = route.params; // 새로 생성된 것인지 구분
-  const { isAuthenticated, owner, setQrCodes, addLocalQrCode, loadLocalQrCodes } = useStore();
-  const viewShotRef = useRef<ViewShot>(null);
+  const { isAuthenticated, owner, setQrCodes, addLocalQrCode, loadLocalQrCodes, removeLocalQrCode } = useStore();
+  const printableViewShotRef = useRef<ViewShot>(null); // 인쇄용 템플릿을 위한 ref
 
   // 디버깅을 위한 로그
-  console.log('QRCompleteScreen - qrCode 데이터:', qrCode);
-  console.log('QRCompleteScreen - qrCodeImage:', qrCode.qrCodeImage);
 
   // 하드웨어 뒤로가기 버튼 제어
   useFocusEffect(
@@ -43,23 +75,20 @@ export default function QRCompleteScreen() {
       };
 
       const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-      
+
       return () => backHandler.remove();
     }, [navigation])
   );
 
   const handleSaveToDevice = async () => {
     try {
-      console.log('로컬 저장 시작 - qrCode 데이터:', qrCode);
-      
+
       // 로컬 스토리지에 QR코드 저장
       await addLocalQrCode(qrCode);
-      
+
       // 로컬 QR 목록 새로고침
       await loadLocalQrCodes();
-      
-      console.log('로컬 저장 완료');
-      
+
       Alert.alert('저장 완룼', 'QR코드가 기기에 저장되었습니다.', [
         {
           text: '확인',
@@ -72,25 +101,22 @@ export default function QRCompleteScreen() {
         }
       ]);
     } catch (error) {
-      console.error('로컬 저장 실패:', error);
+
       Alert.alert('오류', 'QR코드 저장에 실패했습니다.');
     }
   };
 
   const handleLoginAndSave = async () => {
-    console.log('로그인 및 저장 버튼 클릭 - 인증 상태:', { isAuthenticated, owner: owner?.authProvider });
-    
+
     // 게스트가 아닌 실제 로그인 사용자인지 확인
     const isRealUser = isAuthenticated && owner && owner.authProvider !== 'guest';
-    
+
     if (!isRealUser) {
-      console.log('로그인 화면으로 이동');
+
       navigation.navigate('Login', { qrCodeToSave: qrCode });
     } else {
       try {
-        console.log('서버에 QR 저장 시작... qrCode 데이터:', qrCode);
-        console.log('bankAccount 데이터:', qrCode.bankAccount);
-        
+
         // 1. 먼저 계좌 정보를 서버에 저장
         const savedAccount = await accountsAPI.create({
           bankName: qrCode.bankAccount.bankName,
@@ -98,8 +124,7 @@ export default function QRCompleteScreen() {
           accountHolder: qrCode.bankAccount.accountHolder,
           isDefault: false,
         });
-        console.log('계좌 정보 저장 완료:', savedAccount);
-        
+
         // 2. 계좌 정보가 저장된 후 QR 코드 저장
         const savedQR = await qrcodesAPI.create({
           accountId: savedAccount.accountId,
@@ -108,17 +133,15 @@ export default function QRCompleteScreen() {
           discountType: qrCode.discountType,
           discountValue: qrCode.discountValue,
         });
-        console.log('QR 코드 저장 완료:', savedQR);
-        
+
         // 저장된 QR 목록을 다시 불러오기
         const allQRCodes = await qrcodesAPI.getAll();
         setQrCodes(allQRCodes);
-        
+
         Alert.alert('저장 완료', 'QR코드가 서버에 저장되었습니다.');
         navigation.navigate('MyQRList');
       } catch (error) {
-        console.error('QR코드 저장 실패:', error);
-        console.error('에러 상세:', error.response?.data);
+
         Alert.alert('오류', `QR코드 저장에 실패했습니다.\\n${error.response?.data?.message || error.message}`);
       }
     }
@@ -135,7 +158,7 @@ export default function QRCompleteScreen() {
   };
 
   const handleEdit = () => {
-    console.log('편집하기 버튼 클릭 - QR 데이터:', qrCode);
+
     navigation.navigate('CreateQR', { editingQrCode: qrCode });
   };
 
@@ -156,25 +179,41 @@ export default function QRCompleteScreen() {
               // 서버에서 QR 삭제
               if (qrCode.qrId) {
                 await qrcodesAPI.delete(qrCode.qrId);
-              }
-              
-              // 로컬 스토어에서도 삭제
-              if (qrCode.qrId) {
+
+                // 서버에서 최신 QR 목록 가져오기
+                const updatedQRCodes = await qrcodesAPI.getAll();
+                setQrCodes(updatedQRCodes);
+              } else {
+                // 로컬 QR인 경우
                 await removeLocalQrCode(qrCode.qrId);
               }
-              
-              // 서버에서 최신 QR 목록 가져오기
-              const updatedQRCodes = await qrcodesAPI.getAll();
-              setQrCodes(updatedQRCodes);
-              
-              Alert.alert('삭제 완료', 'QR코드가 삭제되었습니다.');
+
+              // 먼저 화면 이동
               navigation.reset({
                 index: 0,
                 routes: [{ name: 'MyQRList' }],
               });
+
+              // 이동 후 성공 메시지 (짧은 지연 후)
+              setTimeout(() => {
+                Alert.alert('삭제 완료', 'QR코드가 삭제되었습니다.');
+              }, 100);
+
             } catch (error) {
-              console.error('QR 삭제 실패:', error);
-              Alert.alert('오류', 'QR코드 삭제에 실패했습니다.');
+
+              // 404 에러는 이미 삭제된 것으로 처리
+              if (error.response?.status === 404) {
+                // 이미 삭제되었으므로 목록 화면으로 이동
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'MyQRList' }],
+                });
+                setTimeout(() => {
+                  Alert.alert('삭제 완료', 'QR코드가 삭제되었습니다.');
+                }, 100);
+              } else {
+                Alert.alert('오류', `QR코드 삭제에 실패했습니다.\n${error.response?.data?.message || error.message}`);
+              }
             }
           },
         },
@@ -184,46 +223,55 @@ export default function QRCompleteScreen() {
 
   const handleSaveImage = async () => {
     try {
-      // 1. 미디어 라이브러리 권한 요청
-      const permissionResult = await MediaLibrary.requestPermissionsAsync();
+      // 1. 미디어 라이브러리 권한 확인 및 요청
+      let permissionResult = await MediaLibrary.getPermissionsAsync();
       
       if (!permissionResult.granted) {
-        Alert.alert(
-          '권한 필요',
-          '갤러리에 이미지를 저장하려면 사진첩 접근 권한이 필요합니다.',
-          [
-            { text: '취소', style: 'cancel' },
-            { text: '설정으로 이동', onPress: () => {
-              // 설정 앱으로 이동하는 로직은 필요시 추가
-            }}
-          ]
-        );
-        return;
+        // 권한이 없으면 요청 (writeOnly 옵션으로 부분 권한도 허용)
+        permissionResult = await MediaLibrary.requestPermissionsAsync(true);
+        
+        if (!permissionResult.granted) {
+          Alert.alert(
+            '권한 필요', 
+            '갤러리에 이미지를 저장하려면 사진첩 접근 권한이 필요합니다.',
+            [
+              { text: '취소', style: 'cancel' },
+              { 
+                text: '허용하기',
+                onPress: async () => {
+                  // 한 번 더 시도
+                  const retryResult = await MediaLibrary.requestPermissionsAsync(true);
+                  if (retryResult.granted) {
+                    handleSaveImage(); // 재귀 호출로 저장 시도
+                  }
+                }
+              }
+            ]
+          );
+          return;
+        }
       }
 
-      // 2. ViewShot으로 특정 영역 캡처
-      if (!viewShotRef.current) {
+      // 2. 인쇄용 템플릿 캡처 (기존 기능을 인쇄용으로 완전 대체)
+      if (!printableViewShotRef.current) {
         Alert.alert('오류', '이미지 캡처에 실패했습니다.');
         return;
       }
 
-      console.log('이미지 캡처 시작...');
-      const uri = await viewShotRef.current.capture();
-      console.log('캡처된 이미지 URI:', uri);
+      const uri = await printableViewShotRef.current.capture();
 
       // 3. 갤러리에 저장
       const asset = await MediaLibrary.createAssetAsync(uri);
-      console.log('갤러리 저장 완료:', asset);
 
       // 4. 성공 피드백
       Alert.alert(
         '저장 완료',
-        'QR코드 이미지가 갤러리에 저장되었습니다.',
+        '인쇄용 QR코드 이미지가 갤러리에 저장되었습니다.\n현장에서 바로 인쇄하여 사용하세요!',
         [{ text: '확인' }]
       );
 
     } catch (error) {
-      console.error('이미지 저장 실패:', error);
+
       Alert.alert(
         '저장 실패', 
         '이미지 저장 중 오류가 발생했습니다. 다시 시도해주세요.',
@@ -249,21 +297,17 @@ export default function QRCompleteScreen() {
         </Text>
         <View style={styles.placeholder} />
       </View>
-      
+
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
       <View style={styles.content}>
-        {/* 캡처할 영역을 ViewShot으로 감싸기 */}
-        <ViewShot 
-          ref={viewShotRef} 
-          options={{ format: "png", quality: 0.9 }}
-          style={styles.captureArea}
-        >
+        {/* 기존 화면 표시용 UI (캡처하지 않음) */}
+        <View style={styles.captureArea}>
           <Text style={styles.qrNameTitle}>{qrCode.qrName}</Text>
-          
+
           <View style={styles.qrContainer}>
             {qrCode.qrCodeImage ? (
               // base64 이미지인 경우 Image 컴포넌트 사용, URL인 경우 QRCode 컴포넌트 사용
@@ -292,15 +336,15 @@ export default function QRCompleteScreen() {
             <Text style={styles.bankInfo}>
               {qrCode.bankAccount?.bankName} | {qrCode.bankAccount?.accountNumber}
             </Text>
-            <Text style={styles.holderInfo}>{qrCode.bankAccount?.accountHolder}</Text>
-            
+            <Text style={styles.holderInfo}>{maskAccountHolderName(qrCode.bankAccount?.accountHolder)}</Text>
+
             {/* 지정 금액 표시 */}
             {qrCode.baseAmount > 0 && (
               <Text style={styles.amountInfo}>
                 지정 금액: {Math.floor(qrCode.baseAmount).toLocaleString()}원
               </Text>
             )}
-            
+
             {/* 할인 정보 표시 */}
             {qrCode.discountType && qrCode.discountValue > 0 && (
               <Text style={styles.discountInfo}>
@@ -309,7 +353,7 @@ export default function QRCompleteScreen() {
                   : `${Math.floor(qrCode.discountValue).toLocaleString()}원 할인`}
               </Text>
             )}
-            
+
             {/* 최종 금액 계산 및 표시 (지정 금액과 할인이 모두 있을 때만) */}
             {qrCode.baseAmount > 0 && qrCode.discountType && qrCode.discountValue > 0 && (
               <Text style={styles.finalAmountInfo}>
@@ -317,26 +361,37 @@ export default function QRCompleteScreen() {
                   const baseAmount = qrCode.baseAmount;
                   const discountValue = qrCode.discountValue;
                   let finalAmount = baseAmount;
-                  
+
                   if (qrCode.discountType === 'percentage') {
                     finalAmount = baseAmount * (1 - discountValue / 100);
                   } else {
                     finalAmount = baseAmount - discountValue;
                   }
-                  
+
                   return Math.floor(Math.max(0, finalAmount)).toLocaleString();
                 })()}원
               </Text>
             )}
           </View>
-        </ViewShot>
+        </View>
+
+        {/* 화면에는 보이지 않지만 캡처용 인쇄 템플릿 */}
+        <View style={styles.hiddenContainer}>
+          <ViewShot 
+            ref={printableViewShotRef} 
+            options={{ format: "png", quality: 1.0 }}
+            style={styles.printableContainer}
+          >
+            <PrintableQRTemplate qrCode={qrCode} />
+          </ViewShot>
+        </View>
 
         <View style={styles.buttonContainer}>
           {isNewlyCreated ? (
             // A. 신규 생성 직후
             (() => {
               const isRealUser = isAuthenticated && owner && owner.authProvider !== 'guest';
-              
+
               if (isRealUser) {
                 // 로그인 사용자는 이미 서버에 저장됨
                 return (
@@ -358,8 +413,8 @@ export default function QRCompleteScreen() {
                 // 게스트 사용자
                 return (
                   <>
-                    <TouchableOpacity style={styles.primaryButton} onPress={handleSaveToDevice}>
-                      <Text style={styles.primaryButtonText}>QR 이미지 저장</Text>
+                    <TouchableOpacity style={styles.primaryButton} onPress={handleSaveImage}>
+                      <Text style={styles.primaryButtonText}>이미지 저장</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.secondaryButton} onPress={handleShare}>
@@ -565,5 +620,14 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     ...typography.styles.buttonPrimary,
     color: colors.error,
+  },
+  // 화면에 보이지 않는 인쇄용 템플릿 컨테이너
+  hiddenContainer: {
+    position: 'absolute',
+    left: -9999, // 화면 밖으로 숨기기
+    top: -9999,
+  },
+  printableContainer: {
+    backgroundColor: 'white',
   },
 });

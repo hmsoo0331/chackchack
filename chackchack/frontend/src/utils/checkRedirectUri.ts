@@ -19,14 +19,8 @@ export const checkRedirectUri = () => {
   // 3. 기본 URI
   const defaultUri = AuthSession.makeRedirectUri();
 
-  console.log('=== Redirect URI 확인 ===');
-  console.log('1. Expo Proxy URI (현재 사용):', proxyUri);
-  console.log('2. Custom Scheme URI:', customUri);
-  console.log('3. Default URI:', defaultUri);
-  console.log('========================');
-  
   alert(`카카오 개발자센터에 등록할 URI:\n\n${proxyUri}`);
-  
+
   return {
     proxyUri,
     customUri,

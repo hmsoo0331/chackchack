@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>계정 삭제 안내 - 착착</title>
+    <meta name="description" content="착착(Chakchak) 앱의 계정 삭제 방법 안내 페이지입니다. 앱 내 삭제 방법과 이메일 요청 방법을 확인하세요.">
+    <meta name="keywords" content="착착, 계정 삭제, 회원 탈퇴, Chakchak, 계정 관리">
+    <link rel="canonical" href="/account-delete">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: 178 100% 24%;
+            --primary-foreground: 0 0% 98%;
+            --secondary: 210 40% 96%;
+            --secondary-foreground: 222 84% 5%;
+            --background: 0 0% 100%;
+            --foreground: 222 84% 5%;
+            --muted: 210 40% 96%;
+            --muted-foreground: 215 16% 47%;
+            --border: 214 32% 91%;
+            --accent: 210 40% 96%;
+            --accent-foreground: 222 84% 5%;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: hsl(var(--background));
+            color: hsl(var(--foreground));
+            line-height: 1.7;
+        }
+
+        .container {
+            min-height: 100vh;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 48px;
+            padding-bottom: 24px;
+            border-bottom: 2px solid hsl(var(--border));
+        }
+
+        .logo {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 16px;
+            display: block;
+        }
+
+        .main-title {
+            font-size: 36px;
+            font-weight: bold;
+            color: hsl(var(--foreground));
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: hsl(var(--muted-foreground));
+            font-weight: 400;
+        }
+
+        .content {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .section {
+            margin-bottom: 48px;
+            padding: 32px;
+            background-color: hsl(var(--accent));
+            border-radius: 12px;
+            border: 1px solid hsl(var(--border));
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: hsl(var(--foreground));
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid hsl(var(--border));
+        }
+
+        .section-content {
+            font-size: 16px;
+            line-height: 1.8;
+            color: hsl(var(--foreground));
+        }
+
+        .section-content p {
+            margin-bottom: 16px;
+        }
+
+        .delete-path {
+            background-color: hsl(var(--background));
+            padding: 16px 20px;
+            border-radius: 8px;
+            border: 2px solid hsl(var(--primary));
+            margin: 20px 0;
+            font-weight: 600;
+            color: hsl(var(--primary));
+            text-align: center;
+        }
+
+        .warning {
+            background-color: #fef3c7;
+            border: 1px solid #f59e0b;
+            color: #92400e;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 500;
+        }
+
+        .email-section {
+            background-color: hsl(var(--background));
+            border: 2px solid hsl(var(--border));
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .email-link {
+            display: inline-block;
+            background-color: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+            padding: 12px 24px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            margin-top: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .email-link:hover {
+            background-color: hsl(var(--primary) / 0.9);
+            transform: translateY(-1px);
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 40px;
+            color: hsl(var(--muted-foreground));
+            text-decoration: none;
+            font-size: 14px;
+            text-align: center;
+            width: 100%;
+        }
+
+        .back-link:hover {
+            color: hsl(var(--primary));
+            text-decoration: underline;
+        }
+
+        /* Mobile Styles */
+        @media (max-width: 768px) {
+            .container {
+                padding: 24px 16px;
+            }
+
+            .main-title {
+                font-size: 28px;
+            }
+
+            .subtitle {
+                font-size: 16px;
+            }
+
+            .section {
+                padding: 24px 20px;
+                margin-bottom: 32px;
+            }
+
+            .section-title {
+                font-size: 20px;
+            }
+
+            .section-content {
+                font-size: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none">
+                <!-- 좌상단 -->
+                <rect x="24" y="24" width="92" height="92" rx="16" fill="none" stroke="#94A3B8" stroke-width="10"/>
+                <rect x="44" y="44" width="52" height="52" rx="12" fill="#94A3B8"/>
+                
+                <!-- 우상단 -->
+                <rect x="140" y="24" width="92" height="92" rx="16" fill="none" stroke="#94A3B8" stroke-width="10"/>
+                <rect x="160" y="44" width="52" height="52" rx="12" fill="#94A3B8"/>
+
+                <!-- 좌하단 -->
+                <rect x="24" y="140" width="92" height="92" rx="16" fill="none" stroke="#94A3B8" stroke-width="10"/>
+                <rect x="44" y="160" width="52" height="52" rx="12" fill="#94A3B8"/>
+
+                <!-- 우하단: 포인트 컬러 채움 + 체크 -->
+                <rect x="140" y="140" width="92" height="92" rx="16" fill="#006D77"/>
+                <path d="M156 186 l18 18 34-38" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            
+            <h1 class="main-title">계정 삭제 안내</h1>
+            <p class="subtitle">착착(Chakchak) 계정 삭제 방법을 안내해드립니다.</p>
+        </div>
+
+        <div class="content">
+            <div class="section">
+                <h2 class="section-title">🏠 앱 내에서 계정 삭제</h2>
+                <div class="section-content">
+                    <p>착착 앱은 앱 내에서 직접 계정을 삭제할 수 있는 기능을 제공합니다. 아래 경로를 통해 계정 삭제를 진행할 수 있습니다.</p>
+                    
+                    <div class="delete-path">
+                        앱 실행 → 내 QR코드 목록 → 더보기(점 3개) 메뉴 → 계정 탈퇴
+                    </div>
+
+                    <div class="warning">
+                        <strong>⚠️ 주의사항</strong><br>
+                        계정 삭제 시 본인이 생성한 모든 QR코드 데이터를 포함한 모든 정보는 서버에서 영구적으로 삭제되며, 복구할 수 없습니다.
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">📧 이메일을 통한 계정 삭제 요청</h2>
+                <div class="section-content">
+                    <p>앱에 접근할 수 없거나 위 방법으로 삭제가 어려운 경우, 아래 이메일로 계정 삭제를 요청해 주시면 본인 확인 절차 후 처리해 드리겠습니다.</p>
+                    
+                    <div class="email-section">
+                        <p><strong>계정 삭제 요청 이메일</strong></p>
+                        <a href="mailto:hmsoo0331@gmail.com?subject=착착(Chakchak)%20계정%20삭제%20요청&body=안녕하세요.%0A%0A착착(Chakchak)%20앱%20계정%20삭제를%20요청합니다.%0A%0A[본인%20확인을%20위해%20아래%20정보를%20입력해주세요]%0A-%20가입%20시%20사용한%20소셜%20로그인%20방법(카카오/네이버/구글):%20%0A-%20가입%20시%20사용한%20이메일%20또는%20전화번호:%20%0A-%20계정%20삭제%20사유(선택사항):%20%0A%0A감사합니다." class="email-link">
+                            hmsoo0331@gmail.com
+                        </a>
+                        <p style="font-size: 14px; color: hsl(var(--muted-foreground)); margin-top: 12px;">
+                            클릭 시 메일 앱으로 연결됩니다
+                        </p>
+                    </div>
+
+                    <p style="font-size: 14px; color: hsl(var(--muted-foreground));">
+                        본인 확인을 위해 가입 시 사용한 소셜 로그인 정보를 함께 기재해주시면 빠른 처리가 가능합니다.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <a href="./" class="back-link">← 개인정보처리방침으로 돌아가기</a>
+    </div>
+</body>
+</html>

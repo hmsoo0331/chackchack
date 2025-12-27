@@ -10,17 +10,17 @@ export const qrcodesAPI = {
     discountValue?: number;
     styleConfigJson?: any;
   }) => {
-    console.log('qrcodes API 호출 - 데이터:', data);
+
     const response = await client.post<QrCode>('/qrcodes', data);
-    console.log('qrcodes API 응답:', response.data);
+
     return response.data;
   },
-  
+
   getAll: async () => {
     const response = await client.get<QrCode[]>('/qrcodes');
     return response.data;
   },
-  
+
   getById: async (id: string) => {
     const response = await client.get<QrCode>(`/qrcodes/${id}`);
     return response.data;
@@ -34,9 +34,9 @@ export const qrcodesAPI = {
     discountValue?: number;
     styleConfigJson?: any;
   }) => {
-    console.log('qrcodes 업데이트 API 호출 - ID:', id, '데이터:', data);
+
     const response = await client.put<QrCode>(`/qrcodes/${id}`, data);
-    console.log('qrcodes 업데이트 API 응답:', response.data);
+
     return response.data;
   },
 
@@ -46,14 +46,14 @@ export const qrcodesAPI = {
   },
 
   sync: async (localQrCodes: any[]) => {
-    console.log('동기화 API 호출 - 로컬 QR 개수:', localQrCodes.length);
+
     const response = await client.post<{
       message: string;
       syncedCount: number;
       skippedCount: number;
       allQrCodes: any[];
     }>('/qrcodes/sync', { localQrCodes });
-    console.log('동기화 API 응답:', response.data);
+
     return response.data;
   },
 };

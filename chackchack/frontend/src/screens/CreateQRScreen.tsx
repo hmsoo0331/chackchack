@@ -39,12 +39,23 @@ const BANKS = [
 export default function CreateQRScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { addLocalQrCode, updateLocalQrCode, removeLocalQrCode, loadLocalQrCodes, isAuthenticated, owner, setQrCodes } = useStore();
-  
+  const { 
+    addLocalQrCode, 
+    updateLocalQrCode, 
+    removeLocalQrCode, 
+    loadLocalQrCodes, 
+    isAuthenticated, 
+    owner, 
+    setQrCodes,
+    checkPrivacyConsent,
+    givePrivacyConsent,
+    isPrivacyConsentGiven
+  } = useStore();
+
   // 편집 모드 확인
   const editingQrCode = route.params?.editingQrCode;
   const isEditMode = !!editingQrCode;
-  
+
   const [qrName, setQrName] = useState('');
   const [selectedBank, setSelectedBank] = useState('은행 선택');
   const [accountNumber, setAccountNumber] = useState('');
@@ -55,14 +66,44 @@ export default function CreateQRScreen() {
   const [enableDiscount, setEnableDiscount] = useState(false);
   const [discountType, setDiscountType] = useState<'percentage' | 'fixed' | null>(null);
   const [discountValue, setDiscountValue] = useState('');
-  
+
   // 포커스 상태 관리
   const [focusedField, setFocusedField] = useState<string | null>(null);
+
+  // 개인정보 동의 상태
+  const [privacyCollectionConsent, setPrivacyCollectionConsent] = useState(false);
+  const [privacyProvisionConsent, setPrivacyProvisionConsent] = useState(false);
+  const [showPrivacyCollectionModal, setShowPrivacyCollectionModal] = useState(false);
+  const [showPrivacyProvisionModal, setShowPrivacyProvisionModal] = useState(false);
+  const [needsPrivacyConsent, setNeedsPrivacyConsent] = useState(false);
+  const [showPrivacyConsentPopup, setShowPrivacyConsentPopup] = useState(false);
+
+  // 개인정보 동의 상태 확인 (편집 모드가 아닐 때만)
+  useEffect(() => {
+    const checkConsentStatus = async () => {
+      if (!isEditMode) {
+        try {
+          const hasConsented = await checkPrivacyConsent();
+          setNeedsPrivacyConsent(!hasConsented);
+          
+          // 이미 동의한 경우 동의 체크박스 자동 체크
+          if (hasConsented) {
+            setPrivacyCollectionConsent(true);
+            setPrivacyProvisionConsent(true);
+          }
+        } catch (error) {
+          console.error('Failed to check consent status:', error);
+          setNeedsPrivacyConsent(true); // 오류 시 동의 필요로 처리
+        }
+      }
+    };
+    
+    checkConsentStatus();
+  }, [isEditMode, checkPrivacyConsent]);
 
   // 편집 모드일 때 기존 데이터로 필드 미리 채우기
   useEffect(() => {
     if (isEditMode && editingQrCode) {
-      console.log('편집 모드 - QR 데이터 로드:', editingQrCode);
       setQrName(editingQrCode.qrName || '');
       setSelectedBank(editingQrCode.bankAccount?.bankName || '은행 선택');
       setAccountNumber(editingQrCode.bankAccount?.accountNumber || '');
@@ -87,42 +128,59 @@ export default function CreateQRScreen() {
       };
 
       const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-      
+
       return () => backHandler.remove();
     }, [navigation])
   );
 
   const handleCreateQR = async () => {
-    console.log(isEditMode ? 'QR 수정 시작' : 'QR 생성 시작');
-    console.log('qrName:', qrName);
-    console.log('selectedBank:', selectedBank);
-    console.log('accountNumber:', accountNumber);
-    console.log('accountHolder:', accountHolder);
-
     if (!qrName || selectedBank === '은행 선택' || !accountNumber || !accountHolder) {
-      console.log('필수 정보 누락');
       Alert.alert('알림', '필수 정보를 모두 입력해주세요.');
       return;
     }
 
+    // 편집 모드가 아닐 때만 개인정보 동의 확인
+    if (!isEditMode) {
+      try {
+        const hasConsented = await checkPrivacyConsent();
+        
+        if (!hasConsented) {
+          // 최초 1회 개인정보 동의가 필요한 경우
+          // 기존 동의 화면 표시 (이미 구현된 UI 사용)
+          if (!privacyCollectionConsent || !privacyProvisionConsent) {
+            Alert.alert(
+              '개인정보 동의 필요',
+              '계좌 정보가 포함된 QR코드를 생성하려면 개인정보 수집 및 제공에 동의해주세요.',
+              [{ text: '확인' }]
+            );
+            return;
+          }
+          
+          // 두 항목 모두 동의한 경우 동의 상태 저장
+          await givePrivacyConsent();
+        }
+      } catch (error) {
+        console.error('Privacy consent check failed:', error);
+        Alert.alert('오류', '개인정보 동의 처리 중 오류가 발생했습니다.');
+        return;
+      }
+    }
+
     try {
-      console.log(isEditMode ? 'QR 수정 중...' : 'QR 생성 중...');
-      
+
       // 편집 모드가 아닐 때만 새 ID 생성
       const qrId = isEditMode ? editingQrCode.qrId : Crypto.randomUUID();
-      
+
       // 게스트가 아닌 실제 로그인 사용자인지 확인
       const isRealUser = isAuthenticated && owner && owner.authProvider !== 'guest';
-      
+
       if (isEditMode) {
         // 편집 모드 구분: 로컬 QR vs 서버 QR
         const isLocalQR = !isRealUser || !editingQrCode.accountId;
-        console.log('편집 모드 - 로컬 QR인지:', isLocalQR);
-        
+
         if (isLocalQR) {
           // 로컬 QR 편집: 기존 로컬 QR 업데이트하고 새로 생성
-          console.log('로컬 QR 편집 - 새 QR로 생성');
-          
+
           // 로컬 QR 편집을 위한 데이터 생성
           const bankAccount = {
             accountId: editingQrCode.bankAccount?.accountId || Crypto.randomUUID(),
@@ -149,7 +207,7 @@ export default function CreateQRScreen() {
             qrCodeImage: qrData,
             bankAccount,
           };
-          
+
           if (isRealUser) {
             // 로그인 사용자: 서버에 저장
             const savedAccount = await accountsAPI.create({
@@ -158,7 +216,7 @@ export default function CreateQRScreen() {
               accountHolder,
               isDefault: false,
             });
-            
+
             const savedQR = await qrcodesAPI.create({
               accountId: savedAccount.accountId,
               qrName,
@@ -166,14 +224,14 @@ export default function CreateQRScreen() {
               discountType: enableDiscount && discountType ? discountType : null,
               discountValue: enableDiscount && discountValue ? Number(discountValue) : null,
             });
-            
+
             // 기존 로컬 QR 삭제
             await removeLocalQrCode(editingQrCode.qrId);
-            
+
             // 서버 QR 목록 새로고침
             const allQRCodes = await qrcodesAPI.getAll();
             setQrCodes(allQRCodes);
-            
+
             Alert.alert('수정 완료', 'QR코드가 수정되었습니다.', [
               { text: '확인', onPress: () => navigation.reset({
                 index: 0,
@@ -184,7 +242,7 @@ export default function CreateQRScreen() {
             // 게스트: 로컬 업데이트
             await updateLocalQrCode(editingQrCode.qrId, updatedQrCode);
             await loadLocalQrCodes();
-            
+
             Alert.alert('수정 완료', 'QR코드가 수정되었습니다.', [
               { text: '확인', onPress: () => navigation.reset({
                 index: 0,
@@ -194,8 +252,7 @@ export default function CreateQRScreen() {
           }
         } else {
           // 서버 QR 편집: 기존 로직 유지
-          console.log('서버 QR 편집 - 서버에 업데이트');
-          
+
           // 1. 먼저 계좌 정보를 서버에 저장/업데이트
           const savedAccount = await accountsAPI.create({
             bankName: selectedBank,
@@ -203,8 +260,7 @@ export default function CreateQRScreen() {
             accountHolder,
             isDefault: false,
           });
-          console.log('계좌 정보 서버 저장 완료:', savedAccount);
-          
+
           // 2. QR 코드 업데이트
           const updatedQR = await qrcodesAPI.update(editingQrCode.qrId, {
             accountId: savedAccount.accountId,
@@ -213,18 +269,17 @@ export default function CreateQRScreen() {
             discountType: enableDiscount && discountType ? discountType : null,
             discountValue: enableDiscount && discountValue ? Number(discountValue) : null,
           });
-          console.log('QR 코드 서버 업데이트 완료:', updatedQR);
-          
+
           // 3. 저장된 QR 목록을 다시 불러오기
           const allQRCodes = await qrcodesAPI.getAll();
           setQrCodes(allQRCodes);
-          
+
           // 수정 완료 후 QR 목록으로 이동
           Alert.alert('수정 완료', 'QR코드가 수정되었습니다.', [
             { text: '확인', onPress: () => navigation.navigate('MyQRList') }
           ]);
         }
-        
+
       } else {
         // 생성 모드: 새 QR 코드 생성
         const bankAccount = {
@@ -243,8 +298,6 @@ export default function CreateQRScreen() {
           enableDiscount && discountValue ? Number(discountValue) : null
         );
 
-        console.log('QR 데이터 생성 완료:', qrData);
-
         const newQrCode = {
           qrId,
           qrName,
@@ -257,13 +310,10 @@ export default function CreateQRScreen() {
           bankAccount,
         };
 
-        console.log('새 QR 코드 생성:', newQrCode);
-        console.log('인증 상태:', { isAuthenticated, owner: owner?.authProvider });
-        
         let savedQrCode = newQrCode;
-        
+
         if (isRealUser) {
-          console.log('로그인 사용자 - 서버에 저장');
+
           try {
             // 1. 먼저 계좌 정보를 서버에 저장
             const savedAccount = await accountsAPI.create({
@@ -272,8 +322,7 @@ export default function CreateQRScreen() {
               accountHolder,
               isDefault: false,
             });
-            console.log('계좌 정보 서버 저장 완료:', savedAccount);
-            
+
             // 2. QR 코드를 서버에 저장
             const savedQR = await qrcodesAPI.create({
               accountId: savedAccount.accountId,
@@ -282,25 +331,22 @@ export default function CreateQRScreen() {
               discountType: enableDiscount && discountType ? discountType : null,
               discountValue: enableDiscount && discountValue ? Number(discountValue) : null,
             });
-            console.log('QR 코드 서버 저장 완료:', savedQR);
-            
+
             // 3. 저장된 QR 목록을 다시 불러오기
             const allQRCodes = await qrcodesAPI.getAll();
             setQrCodes(allQRCodes);
-            
+
             savedQrCode = savedQR;
           } catch (error) {
-            console.error('서버 저장 실패:', error);
+
             Alert.alert('오류', '서버 저장에 실패했습니다. 로컬에 저장합니다.');
             await addLocalQrCode(newQrCode);
           }
         } else {
-          console.log('게스트 사용자 - 로컬에만 저장');
+
           await addLocalQrCode(newQrCode);
         }
-        
-        console.log('QR 코드 저장 완료');
-        
+
         // QR 완료 화면으로 이동하되, 스택을 리셋해서 뒤로가기 시 목록으로 이동하도록 함
         navigation.reset({
           index: 1,
@@ -309,10 +355,10 @@ export default function CreateQRScreen() {
             { name: 'QRComplete', params: { qrCode: savedQrCode, isNewlyCreated: true } }
           ],
         });
-        console.log('QR 완료 페이지로 이동');
+
       }
     } catch (error) {
-      console.error('QR 생성 오류:', error);
+
       Alert.alert('오류', 'QR코드 생성에 실패했습니다.');
     }
   };
@@ -340,7 +386,7 @@ export default function CreateQRScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>필수 정보</Text>
-          
+
           <TextInput
             style={[
               styles.input,
@@ -399,6 +445,7 @@ export default function CreateQRScreen() {
             onBlur={() => setFocusedField(null)}
           />
         </View>
+
 
         <View style={styles.section}>
           <View style={styles.toggleRow}>
@@ -478,10 +525,14 @@ export default function CreateQRScreen() {
         </View>
 
         <TouchableOpacity 
-          style={styles.createButton} 
-          onPress={() => {
-            console.log('QR 생성하기 버튼 클릭됨');
-            handleCreateQR();
+          style={styles.createButton}
+          onPress={async () => {
+            // 편집 모드가 아니고 개인정보 동의가 필요한 경우 팝업 표시
+            if (!isEditMode && needsPrivacyConsent) {
+              setShowPrivacyConsentPopup(true);
+            } else {
+              handleCreateQR();
+            }
           }}
         >
           <Text style={styles.createButtonText}>{isEditMode ? '수정 완료' : 'QR 생성하기'}</Text>
@@ -523,6 +574,166 @@ export default function CreateQRScreen() {
             >
               <Text style={styles.modalCloseText}>닫기</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 개인정보 수집 및 이용 동의 모달 */}
+      <Modal
+        visible={showPrivacyCollectionModal}
+        transparent={true}
+        animationType="slide"
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.privacyModalContent}>
+            <Text style={styles.privacyModalTitle}>개인정보 수집 및 이용 동의</Text>
+            <ScrollView style={styles.privacyScrollView}>
+              <Text style={styles.privacyText}>
+                '착착(Chakchak)'(이하 '회사')는 QR코드 생성 및 관련 서비스 제공을 위해 개인정보보호법 제15조에 따라 아래와 같이 귀하의 개인정보를 수집 및 이용하는 것에 대한 동의를 받고자 합니다.
+                {"\n\n"}
+                <Text style={styles.privacyTableHeader}>수집·이용 목적 | 수집 항목 | 보유 및 이용기간</Text>
+                {"\n\n"}
+                계좌이체 QR코드 생성 및 관련 서비스 제공 | 필수: 은행명, 계좌번호, 예금주명 | 회원 탈퇴 시까지. 단, 관계 법령에 따라 보존할 필요가 있는 경우 해당 법령에서 정한 기간 동안 보관합니다.
+                {"\n\n"}
+                <Text style={styles.privacyBold}>※ 동의 거부 권리 및 불이익 안내</Text>
+                {"\n"}
+                귀하는 위 개인정보 수집 및 이용에 대한 동의를 거부할 권리가 있습니다. 다만, 동의를 거부하실 경우 QR코드 생성 및 관련 서비스 이용이 불가능합니다.
+              </Text>
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.privacyModalCloseButton}
+              onPress={() => setShowPrivacyCollectionModal(false)}
+            >
+              <Text style={styles.modalCloseText}>확인</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 개인정보 제3자 제공 동의 모달 */}
+      <Modal
+        visible={showPrivacyProvisionModal}
+        transparent={true}
+        animationType="slide"
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.privacyModalContent}>
+            <Text style={styles.privacyModalTitle}>개인정보 제3자 제공 동의</Text>
+            <ScrollView style={styles.privacyScrollView}>
+              <Text style={styles.privacyText}>
+                '회사'는 QR코드 스캔을 통한 원활한 계좌 정보 제공을 위해 개인정보보호법 제17조에 따라 아래와 같이 귀하의 개인정보를 제3자에게 제공하는 것에 대한 동의를 받고자 합니다.
+                {"\n\n"}
+                <Text style={styles.privacyTableHeader}>제공받는 자 | 제공 목적 | 제공 항목 | 보유 및 이용기간</Text>
+                {"\n\n"}
+                '착착' QR코드를 스캔하는 불특정 다수의 이용자 | QR코드 스캔을 통한 원활한 계좌이체 정보 확인 | 은행명, 계좌번호, 예금주명(가운데 글자 익명 처리, 예: 한*수) | 정보 확인 즉시 파기 (일회성 조회)
+                {"\n\n"}
+                <Text style={styles.privacyBold}>※ 동의 거부 권리 및 불이익 안내</Text>
+                {"\n"}
+                귀하는 위 개인정보 제3자 제공에 대한 동의를 거부할 권리가 있습니다. 다만, 동의를 거부하실 경우 QR코드 생성 및 관련 서비스 이용이 불가능합니다.
+              </Text>
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.privacyModalCloseButton}
+              onPress={() => setShowPrivacyProvisionModal(false)}
+            >
+              <Text style={styles.modalCloseText}>확인</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 개인정보 동의 통합 팝업 */}
+      <Modal
+        visible={showPrivacyConsentPopup}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.privacyConsentPopupContent}>
+            <Text style={styles.privacyConsentPopupTitle}>개인정보 처리 동의</Text>
+            <Text style={styles.privacyConsentPopupDescription}>
+              QR코드 생성을 위해 개인정보 수집 및 제공이 필요합니다.
+            </Text>
+            
+            <TouchableOpacity 
+              style={styles.consentRow}
+              onPress={() => setPrivacyCollectionConsent(!privacyCollectionConsent)}
+            >
+              <View style={styles.checkboxContainer}>
+                <View style={[styles.checkbox, privacyCollectionConsent && styles.checkboxChecked]}>
+                  {privacyCollectionConsent && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+              </View>
+              <Text style={styles.consentText}>
+                <Text style={styles.requiredTag}>[필수]</Text> 개인정보 수집 및 이용에 동의합니다.
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.detailLink}
+              onPress={() => {
+                setShowPrivacyConsentPopup(false);
+                setShowPrivacyCollectionModal(true);
+              }}
+            >
+              <Text style={styles.detailLinkText}>자세히 보기</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.consentRow}
+              onPress={() => setPrivacyProvisionConsent(!privacyProvisionConsent)}
+            >
+              <View style={styles.checkboxContainer}>
+                <View style={[styles.checkbox, privacyProvisionConsent && styles.checkboxChecked]}>
+                  {privacyProvisionConsent && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+              </View>
+              <Text style={styles.consentText}>
+                <Text style={styles.requiredTag}>[필수]</Text> 개인정보 제3자 제공에 동의합니다.
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.detailLink}
+              onPress={() => {
+                setShowPrivacyConsentPopup(false);
+                setShowPrivacyProvisionModal(true);
+              }}
+            >
+              <Text style={styles.detailLinkText}>자세히 보기</Text>
+            </TouchableOpacity>
+
+            <View style={styles.privacyConsentPopupButtons}>
+              <TouchableOpacity 
+                style={styles.privacyConsentCancelButton}
+                onPress={() => setShowPrivacyConsentPopup(false)}
+              >
+                <Text style={styles.privacyConsentCancelText}>취소</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[
+                  styles.privacyConsentConfirmButton,
+                  (!privacyCollectionConsent || !privacyProvisionConsent) && styles.privacyConsentConfirmButtonDisabled
+                ]}
+                onPress={async () => {
+                  if (!privacyCollectionConsent || !privacyProvisionConsent) {
+                    Alert.alert('알림', '필수 동의 항목을 모두 체크해주세요.');
+                    return;
+                  }
+                  setShowPrivacyConsentPopup(false);
+                  handleCreateQR();
+                }}
+                disabled={!privacyCollectionConsent || !privacyProvisionConsent}
+              >
+                <Text style={[
+                  styles.privacyConsentConfirmText,
+                  (!privacyCollectionConsent || !privacyProvisionConsent) && styles.privacyConsentConfirmTextDisabled
+                ]}>
+                  동의하고 QR 생성하기
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -721,5 +932,155 @@ const styles = StyleSheet.create({
   modalCloseText: {
     ...typography.styles.body,
     color: colors.textPrimary,
+  },
+  consentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  checkboxContainer: {
+    marginRight: spacing.md,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+  },
+  checkboxChecked: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  checkmark: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  consentText: {
+    ...typography.styles.body,
+    color: colors.textPrimary,
+    flex: 1,
+  },
+  requiredTag: {
+    color: colors.error,
+    fontWeight: typography.weights.bold,
+  },
+  detailLink: {
+    alignSelf: 'flex-start',
+    marginBottom: spacing.lg,
+    marginLeft: 32,
+  },
+  detailLinkText: {
+    ...typography.styles.small,
+    color: colors.primary,
+    textDecorationLine: 'underline',
+  },
+  createButtonDisabled: {
+    backgroundColor: colors.gray400,
+    shadowColor: 'transparent',
+    elevation: 0,
+  },
+  privacyModalContent: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    padding: spacing.xl,
+    maxHeight: '80%',
+    height: '80%',
+  },
+  privacyModalTitle: {
+    ...typography.styles.heading3,
+    color: colors.textPrimary,
+    marginBottom: spacing.xl,
+    textAlign: 'center',
+    fontWeight: typography.weights.bold,
+  },
+  privacyScrollView: {
+    flex: 1,
+    marginBottom: spacing.xl,
+  },
+  privacyText: {
+    ...typography.styles.body,
+    color: colors.textPrimary,
+    lineHeight: 22,
+  },
+  privacyTableHeader: {
+    fontWeight: typography.weights.bold,
+    color: colors.textSecondary,
+  },
+  privacyBold: {
+    fontWeight: typography.weights.bold,
+    color: colors.textPrimary,
+  },
+  privacyModalCloseButton: {
+    padding: spacing.lg,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  privacyConsentPopupContent: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    margin: spacing.xl,
+    maxHeight: '80%',
+  },
+  privacyConsentPopupTitle: {
+    ...typography.styles.heading3,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  privacyConsentPopupDescription: {
+    ...typography.styles.body,
+    color: colors.textSecondary,
+    marginBottom: spacing.xl,
+    textAlign: 'center',
+  },
+  privacyConsentPopupButtons: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.xl,
+  },
+  privacyConsentCancelButton: {
+    flex: 1,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  privacyConsentCancelText: {
+    ...typography.styles.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  privacyConsentConfirmButton: {
+    flex: 2,
+    padding: spacing.lg,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  privacyConsentConfirmButtonDisabled: {
+    backgroundColor: colors.gray400,
+  },
+  privacyConsentConfirmText: {
+    ...typography.styles.body,
+    color: colors.white,
+    fontWeight: typography.weights.bold,
+    textAlign: 'center',
+    fontSize: 14,
+  },
+  privacyConsentConfirmTextDisabled: {
+    color: colors.textDisabled,
   },
 });

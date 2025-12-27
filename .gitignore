@@ -77,3 +77,24 @@ dist/
 
 # Server sensitive information
 documents/serverinfo.md
+# Keystore files - NEVER commit these
+*.keystore
+*.jks
+credentials.json
+upload_certificate.pem
+KEYSTORE_INFO.md
+
+# Build artifacts
+apk/
+*.apk
+*.aab
+*.tar.gz
+
+# Server files
+*.pem
+nohup.out
+server.log
+
+# Debug folders
+debug-*/
+scripts/

@@ -26,6 +26,9 @@ export class BankAccount {
   @JoinColumn({ name: 'owner_id' })
   owner: Owner;
 
-  @OneToMany(() => QrCode, qrCode => qrCode.bankAccount)
+  @OneToMany(() => QrCode, qrCode => qrCode.bankAccount, {
+    cascade: ['remove'],
+    onDelete: 'CASCADE'
+  })
   qrCodes: QrCode[];
 }

@@ -125,7 +125,44 @@ Authorization: Bearer <token>
 }
 ```
 
-#### 4. 계정 탈퇴
+#### 4. 개인정보 동의 상태 업데이트 ✨ v1.4 신규
+```http
+POST /auth/privacy-consent
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "message": "Privacy consent updated successfully"
+}
+```
+
+**설명:**
+- 사용자의 개인정보 수집 및 제공 동의 상태를 `true`로 업데이트
+- 동의 날짜도 함께 기록됨
+- 로그인 사용자만 사용 가능 (게스트는 로컬 저장소 사용)
+
+#### 5. 개인정보 동의 상태 조회 ✨ v1.4 신규
+```http
+GET /auth/privacy-consent
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "isConsentGiven": true,
+  "consentDate": "2025-09-09T10:30:00.000Z"
+}
+```
+
+**설명:**
+- 사용자의 개인정보 동의 상태 확인
+- `isConsentGiven`: 동의 여부 (boolean)
+- `consentDate`: 동의한 날짜 (동의한 경우만 반환)
+
+#### 6. 계정 탈퇴
 ```http
 DELETE /auth/me
 Authorization: Bearer <token>

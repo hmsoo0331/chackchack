@@ -7,7 +7,7 @@ export const typography = {
     medium: '500' as TextStyle['fontWeight'],
     bold: '700' as TextStyle['fontWeight'],
   },
-  
+
   // Font Sizes
   sizes: {
     xs: 12,
@@ -19,7 +19,7 @@ export const typography = {
     '3xl': 28,
     '4xl': 32,
   },
-  
+
   // Typography Styles
   styles: {
     // 화면 제목 - Bold (700)
@@ -38,7 +38,7 @@ export const typography = {
       fontWeight: '700' as TextStyle['fontWeight'],
       lineHeight: 32,
     },
-    
+
     // 버튼 텍스트, 필드 제목 - Medium (500)
     buttonPrimary: {
       fontSize: 18,
@@ -60,7 +60,7 @@ export const typography = {
       fontWeight: '500' as TextStyle['fontWeight'],
       lineHeight: 24,
     },
-    
+
     // 보조 설명 텍스트 - Regular (400)
     body: {
       fontSize: 16,

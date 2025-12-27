@@ -94,50 +94,56 @@
         
         console.log('OAuth Callback:', { code, error, state });
         
+        // 카카오 네이티브 앱 키 기반 URL 스킴
+        const KAKAO_NATIVE_APP_KEY = '6b016d71ce5ad1c2b457a87013388800';
+        const URL_SCHEME = `kakao${KAKAO_NATIVE_APP_KEY}://oauth`;
+
         if (error) {
-            // 에러 처리
-            document.getElementById('error-container').innerHTML = `
-                <div class="error">
-                    <p>로그인 중 오류가 발생했습니다.</p>
-                    <p>오류: ${error}</p>
-                    <a href="chackchack://oauth?error=${error}" class="button">앱으로 돌아가기</a>
-                </div>
-            `;
-            
-            // 3초 후 자동으로 앱으로 이동 시도
-            setTimeout(() => {
-                window.location.href = `chackchack://oauth?error=${error}`;
-            }, 3000);
+            // 에러 처리 - WebBrowser에서 URL 파라미터로 캐치할 수 있도록 URL만 변경
+            document.querySelector('.message').innerHTML = `로그인 중 오류가 발생했습니다.`;
+            document.querySelector('.sub-message').innerHTML = `오류: ${error}`;
+
+            // WebBrowser가 캐치할 수 있도록 현재 URL에 에러 정보 추가
+            const newUrl = `${window.location.origin}${window.location.pathname}?error=${error}`;
+            window.history.replaceState({}, '', newUrl);
         } else if (code) {
-            // 성공 - 앱으로 리다이렉트
-            const redirectUrl = `chackchack://oauth?code=${code}&state=${state || ''}`;
-            
-            // 즉시 앱으로 이동 시도
-            window.location.href = redirectUrl;
-            
-            // 앱이 설치되어 있지 않은 경우를 위한 메시지
+            // 성공 - WebBrowser가 URL에서 code를 읽을 수 있도록 단순히 표시만 함
+            document.querySelector('.message').innerHTML = `로그인 성공!`;
+            document.querySelector('.sub-message').innerHTML = `인증이 완료되었습니다. 앱으로 돌아갑니다...`;
+
+            // WebBrowser가 캐치할 수 있도록 현재 URL에 코드 정보 추가
+            const newUrl = `${window.location.origin}${window.location.pathname}?code=${code}&state=${state || ''}`;
+            window.history.replaceState({}, '', newUrl);
+
+            // 시각적 피드백 제공
+            document.querySelector('.spinner').style.borderTopColor = '#4CAF50';
+
+            console.log('OAuth success, WebBrowser should capture the URL with code:', code);
+
+            // 강제로 WebBrowser를 닫아서 앱으로 돌아가기 (3초 후)
             setTimeout(() => {
-                document.querySelector('.message').textContent = '앱으로 이동 중...';
-                document.querySelector('.sub-message').innerHTML = `
-                    앱이 자동으로 열리지 않으면 
-                    <a href="${redirectUrl}" style="color: white; text-decoration: underline;">여기를 클릭</a>하세요.
-                `;
-            }, 1000);
-            
-            // 5초 후에도 페이지에 남아있으면 수동 버튼 표시
-            setTimeout(() => {
-                document.getElementById('error-container').innerHTML = `
-                    <a href="${redirectUrl}" class="button">앱으로 이동</a>
-                `;
-            }, 5000);
+                try {
+                    // WebBrowser close 시도
+                    window.ReactNativeWebView?.postMessage(JSON.stringify({
+                        type: 'OAUTH_SUCCESS',
+                        code: code,
+                        state: state
+                    }));
+                } catch (e) {
+                    console.log('WebView 메시지 전송 실패, 일반 브라우저일 수 있음');
+                }
+
+                // URL 변경으로 WebBrowser가 감지하도록 시도
+                window.location.href = `exp://close?code=${code}&state=${state}`;
+            }, 2000);
         } else {
             // 파라미터가 없는 경우
-            document.getElementById('error-container').innerHTML = `
-                <div class="error">
-                    <p>잘못된 요청입니다.</p>
-                    <a href="chackchack://" class="button">앱으로 돌아가기</a>
-                </div>
-            `;
+            document.querySelector('.message').innerHTML = `잘못된 요청입니다.`;
+            document.querySelector('.sub-message').innerHTML = `올바른 파라미터를 받지 못했습니다.`;
+
+            // WebBrowser가 캐치할 수 있도록 현재 URL에 에러 정보 추가
+            const newUrl = `${window.location.origin}${window.location.pathname}?error=no_code_received`;
+            window.history.replaceState({}, '', newUrl);
         }
     </script>
 </body>

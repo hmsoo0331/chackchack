@@ -7,6 +7,9 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { Owner } from '../entities/owner.entity';
+import { BankAccount } from '../entities/bank-account.entity';
+import { QrCode } from '../entities/qr-code.entity';
+import { PaymentNotification } from '../entities/payment-notification.entity';
 
 @Module({
   imports: [
@@ -21,7 +24,7 @@ import { Owner } from '../entities/owner.entity';
         },
       }),
     }),
-    TypeOrmModule.forFeature([Owner]),
+    TypeOrmModule.forFeature([Owner, BankAccount, QrCode, PaymentNotification]),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],
