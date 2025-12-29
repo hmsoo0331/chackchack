@@ -13,7 +13,7 @@ interface AppState {
   localQrCodes: QrCode[];
   isPrivacyConsentGiven: boolean;
 
-  setAuth: (token: string, owner: Owner) => void;
+  setAuth: (token: string, owner: Owner) => Promise<void>;
   logout: () => void;
   setBankAccounts: (accounts: BankAccount[]) => void;
   setQrCodes: (qrCodes: QrCode[]) => void;
@@ -36,23 +36,18 @@ export const useStore = create<AppState>((set, get) => ({
   localQrCodes: [],
   isPrivacyConsentGiven: false,
 
-  setAuth: (token: string, owner: Owner) => {
+  setAuth: async (token: string, owner: Owner) => {
     try {
       console.log('🔐 Setting auth state...', { token: token.substring(0, 10) + '...', ownerId: owner.ownerId });
-      
-      // 즉시 상태 업데이트 (UI 응답성 향상)
+
+      // AsyncStorage에 먼저 저장 (await로 완료 대기)
+      await AsyncStorage.setItem('accessToken', token);
+      await AsyncStorage.setItem('owner', JSON.stringify(owner));
+      console.log('✅ Auth state saved to storage');
+
+      // 상태 업데이트
       set({ isAuthenticated: true, accessToken: token, owner });
-      
-      // AsyncStorage 저장은 백그라운드에서 실행
-      Promise.all([
-        AsyncStorage.setItem('accessToken', token),
-        AsyncStorage.setItem('owner', JSON.stringify(owner))
-      ]).then(() => {
-        console.log('✅ Auth state saved to storage');
-      }).catch(error => {
-        console.error('❌ Failed to save auth state to storage:', error);
-      });
-      
+
       console.log('✅ Auth state updated successfully');
     } catch (error) {
       console.error('❌ Failed to set auth state:', error);

@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
-  Share,
   Alert,
   Image,
   ScrollView,
@@ -15,6 +14,7 @@ import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/nativ
 import QRCode from 'react-native-qrcode-svg';
 import ViewShot from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
 import { useStore } from '../store/useStore';
 import { qrcodesAPI } from '../api/qrcodes';
 import { accountsAPI } from '../api/accounts';
@@ -149,9 +149,27 @@ export default function QRCompleteScreen() {
 
   const handleShare = async () => {
     try {
-      await Share.share({
-        message: `${qrCode.qrName} QR코드\n${qrCode.qrCodeImage}`,
+      // 1. 공유 기능이 지원되는지 확인
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert('오류', '이 기기에서는 공유 기능을 사용할 수 없습니다.');
+        return;
+      }
+
+      // 2. ViewShot으로 QR 이미지 캡처
+      if (!printableViewShotRef.current) {
+        Alert.alert('오류', '이미지 캡처에 실패했습니다.');
+        return;
+      }
+
+      const uri = await printableViewShotRef.current.capture();
+
+      // 3. expo-sharing으로 이미지 파일 공유
+      await Sharing.shareAsync(uri, {
+        mimeType: 'image/png',
+        dialogTitle: `${qrCode.qrName} QR코드 공유`,
       });
+
     } catch (error) {
       Alert.alert('오류', '공유에 실패했습니다.');
     }

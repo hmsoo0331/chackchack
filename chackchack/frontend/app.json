@@ -2,7 +2,7 @@
   "expo": {
     "name": "착착",
     "slug": "chackchack",
-    "version": "1.0.17",
+    "version": "1.0.18",
     "orientation": "portrait",
     "icon": "./assets/icon-new.png",
     "userInterfaceStyle": "light",
@@ -18,7 +18,7 @@
     },
     "android": {
       "package": "com.chackchack.app",
-      "versionCode": 20,
+      "versionCode": 21,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon-new.png",
         "backgroundColor": "#ffffff"
